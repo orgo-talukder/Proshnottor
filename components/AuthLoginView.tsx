@@ -1,8 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth, ADMIN_ALLOWLIST_EMAIL } from '../lib/auth-context';
-import { Lock, Mail, User, ArrowRight, ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
+import { useAuth } from '../lib/auth-context';
+import {
+  Lock,
+  Mail,
+  User,
+  ArrowRight,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  Sparkles,
+} from 'lucide-react';
 
 interface AuthLoginViewProps {
   nextUrl?: string;
@@ -18,37 +30,63 @@ export default function AuthLoginView({
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
+
+  // Show/Hide password toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Password matching validation
+  const isPasswordMatch = tab === 'signup' && confirmPassword.length > 0 && password === confirmPassword;
+  const isPasswordMismatch = tab === 'signup' && confirmPassword.length > 0 && password !== confirmPassword;
+  const isLengthValid = password.length >= 6;
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsOperationNotAllowed(false);
+
+    if (tab === 'signup') {
+      if (!displayName.trim()) {
+        setErrorMsg('অনুগ্রহ করে আপনার পুরো নাম লিখুন।');
+        return;
+      }
+      if (password.length < 6) {
+        setErrorMsg('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setErrorMsg('পাসওয়ার্ড এবং কনফার্ম পাসওয়ার্ড মিলছে না। অনুগ্রহ করে যাচাই করুন।');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
       if (tab === 'login') {
         await signInWithEmail(email, password);
       } else {
-        if (!displayName.trim()) {
-          setErrorMsg('অনুগ্রহ করে আপনার পুরো নাম লিখুন।');
-          setLoading(false);
-          return;
-        }
         await signUpWithEmail(email, password, displayName);
       }
       onSuccessRedirect(nextUrl);
     } catch (err: any) {
       console.error('Auth error:', err);
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      if (err.code === 'auth/operation-not-allowed') {
+        setIsOperationNotAllowed(true);
+        setErrorMsg('Firebase Authentication-এ Email/Password Sign-In Provider নিষ্ক্রিয় (Disabled) রয়েছে।');
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setErrorMsg('ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।');
       } else if (err.code === 'auth/email-already-in-use') {
-        setErrorMsg('এই ইমেইলটি দিয়ে ইতিমধ্যে অ্যাকাউন্ট খোলা আছে। লগইন করুন।');
+        setErrorMsg('এই ইমেইলটি দিয়ে ইতিমধ্যে অ্যাকাউন্ট খোলা আছে। লগইন ট্যাবে গিয়ে লগইন করুন।');
       } else if (err.code === 'auth/weak-password') {
         setErrorMsg('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
       } else {
-        setErrorMsg('লগইনে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+        setErrorMsg(err.message || 'লগইনে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
       }
     } finally {
       setLoading(false);
@@ -57,6 +95,7 @@ export default function AuthLoginView({
 
   const handleGoogleLogin = async () => {
     setErrorMsg('');
+    setIsOperationNotAllowed(false);
     setLoading(true);
     try {
       await signInWithGoogle();
@@ -100,6 +139,7 @@ export default function AuthLoginView({
               onClick={() => {
                 setTab('login');
                 setErrorMsg('');
+                setIsOperationNotAllowed(false);
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
                 tab === 'login'
@@ -113,6 +153,7 @@ export default function AuthLoginView({
               onClick={() => {
                 setTab('signup');
                 setErrorMsg('');
+                setIsOperationNotAllowed(false);
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
                 tab === 'signup'
@@ -124,8 +165,37 @@ export default function AuthLoginView({
             </button>
           </div>
 
-          {/* Error Message */}
-          {errorMsg && (
+          {/* Operation Not Allowed Special Help Box */}
+          {isOperationNotAllowed && (
+            <div className="p-4 rounded-xl border border-amber-900/60 bg-amber-950/30 text-amber-200 text-xs space-y-3">
+              <div className="flex items-start gap-2.5">
+                <HelpCircle className="h-4 w-4 text-[#FACC15] shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold text-[#FACC15]">Email/Password Provider চালু করার নিয়ম:</span>
+                  <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                    Firebase Console &gt; Authentication &gt; Sign-in method &gt; Email/Password অপশনটি <strong>Enable</strong> করুন।
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-amber-900/40">
+                <span className="text-[11px] text-[#A3A3A3] block mb-2">
+                  অথবা এখনই দ্রুত প্রবেশের জন্য নিচের বাটনে ক্লিক করুন:
+                </span>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full h-9 rounded-lg bg-[#FACC15] hover:bg-[#EAB308] text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Google দিয়ে সরাসরি প্রবেশ করুন</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* General Error Message */}
+          {errorMsg && !isOperationNotAllowed && (
             <div className="p-3 rounded-xl border border-rose-900/50 bg-rose-950/40 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
               <span>{errorMsg}</span>
@@ -203,27 +273,103 @@ export default function AuthLoginView({
               </div>
             </div>
 
+            {/* Password Field with Show/Hide Eye Toggle */}
             <div className="space-y-1">
-              <label className="block text-[11px] font-medium text-[#A3A3A3]">
-                পাসওয়ার্ড (Password)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-medium text-[#A3A3A3]">
+                  পাসওয়ার্ড (Password)
+                </label>
+                {tab === 'signup' && password.length > 0 && (
+                  <span
+                    className={`text-[10px] font-mono ${
+                      isLengthValid ? 'text-emerald-400' : 'text-amber-400'
+                    }`}
+                  >
+                    {isLengthValid ? '✓ কমপক্ষে ৬ অক্ষর' : 'কমপক্ষে ৬ অক্ষর প্রয়োজন'}
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full h-10 pl-9 pr-3 rounded-xl border border-[#262626] bg-[#121212] text-xs text-[#F5F5F5] placeholder-[#444] outline-none focus:border-[#FACC15]"
+                  className="w-full h-10 pl-9 pr-10 rounded-xl border border-[#262626] bg-[#121212] text-xs text-[#F5F5F5] placeholder-[#444] outline-none focus:border-[#FACC15]"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#F5F5F5] p-1 transition-colors"
+                  title={showPassword ? 'পাসওয়ার্ড গোপন করুন' : 'পাসওয়ার্ড দেখুন'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
+            {/* Confirm Password Field (Only on Sign Up tab) */}
+            {tab === 'signup' && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-medium text-[#A3A3A3]">
+                    পাসওয়ার্ড নিশ্চিত করুন (Confirm Password)
+                  </label>
+                  {confirmPassword.length > 0 && (
+                    <span
+                      className={`text-[10px] flex items-center gap-1 font-medium ${
+                        isPasswordMatch ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {isPasswordMatch ? (
+                        <>
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>পাসওয়ার্ড মিলেছে</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-3 w-3" />
+                          <span>পাসওয়ার্ড মিলছে না</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                    className={`w-full h-10 pl-9 pr-10 rounded-xl border bg-[#121212] text-xs text-[#F5F5F5] placeholder-[#444] outline-none transition-colors ${
+                      isPasswordMismatch
+                        ? 'border-rose-600 focus:border-rose-500'
+                        : isPasswordMatch
+                        ? 'border-emerald-600 focus:border-emerald-500'
+                        : 'border-[#262626] focus:border-[#FACC15]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#F5F5F5] p-1 transition-colors"
+                    title={showConfirmPassword ? 'পাসওয়ার্ড গোপন করুন' : 'পাসওয়ার্ড দেখুন'}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (tab === 'signup' && isPasswordMismatch)}
               className="w-full h-11 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.99] disabled:opacity-50 mt-2"
             >
               <span>{loading ? 'প্রসেসিং হচ্ছে...' : tab === 'login' ? 'লগইন করুন' : 'অ্যাকাউন্ট তৈরি করুন'}</span>
@@ -232,7 +378,7 @@ export default function AuthLoginView({
           </form>
         </div>
 
-        {/* Security / Admin hint */}
+        {/* Security hint */}
         <div className="text-center text-[11px] text-[#555]">
           <span>নিরাপদ Firebase Authentication ও ক্লাউড ডাটাবেজ দ্বারা সুরক্ষিত</span>
         </div>
