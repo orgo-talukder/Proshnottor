@@ -14,6 +14,10 @@ import {
   XCircle,
   HelpCircle,
   Sparkles,
+  Copy,
+  Check,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 
 interface AuthLoginViewProps {
@@ -35,20 +39,34 @@ export default function AuthLoginView({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isOperationNotAllowed, setIsOperationNotAllowed] = useState(false);
+  const [isUnauthorizedDomain, setIsUnauthorizedDomain] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   // Show/Hide password toggles
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Current domain name
+  const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'mcq-123.vercel.app';
 
   // Password matching validation
   const isPasswordMatch = tab === 'signup' && confirmPassword.length > 0 && password === confirmPassword;
   const isPasswordMismatch = tab === 'signup' && confirmPassword.length > 0 && password !== confirmPassword;
   const isLengthValid = password.length >= 6;
 
+  const handleCopyDomain = () => {
+    if (typeof window !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(currentHostname);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setIsOperationNotAllowed(false);
+    setIsUnauthorizedDomain(false);
 
     if (tab === 'signup') {
       if (!displayName.trim()) {
@@ -79,6 +97,9 @@ export default function AuthLoginView({
       if (err.code === 'auth/operation-not-allowed') {
         setIsOperationNotAllowed(true);
         setErrorMsg('Firebase Authentication-এ Email/Password Sign-In Provider নিষ্ক্রিয় (Disabled) রয়েছে।');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setIsUnauthorizedDomain(true);
+        setErrorMsg('এই ডোমেনটি Firebase Console-এ অনুমোদিত (Authorized) নয়।');
       } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setErrorMsg('ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।');
       } else if (err.code === 'auth/email-already-in-use') {
@@ -96,13 +117,17 @@ export default function AuthLoginView({
   const handleGoogleLogin = async () => {
     setErrorMsg('');
     setIsOperationNotAllowed(false);
+    setIsUnauthorizedDomain(false);
     setLoading(true);
     try {
       await signInWithGoogle();
       onSuccessRedirect(nextUrl);
     } catch (err: any) {
       console.error('Google auth error:', err);
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/unauthorized-domain') {
+        setIsUnauthorizedDomain(true);
+        setErrorMsg('আপনার বর্তমান ডোমেনটি Firebase Console-এ অনুমোদিত (Authorized) নয়।');
+      } else if (err.code !== 'auth/popup-closed-by-user') {
         setErrorMsg('গুগল সাইন-ইনে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।');
       }
     } finally {
@@ -140,6 +165,7 @@ export default function AuthLoginView({
                 setTab('login');
                 setErrorMsg('');
                 setIsOperationNotAllowed(false);
+                setIsUnauthorizedDomain(false);
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
                 tab === 'login'
@@ -154,6 +180,7 @@ export default function AuthLoginView({
                 setTab('signup');
                 setErrorMsg('');
                 setIsOperationNotAllowed(false);
+                setIsUnauthorizedDomain(false);
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
                 tab === 'signup'
@@ -165,8 +192,53 @@ export default function AuthLoginView({
             </button>
           </div>
 
+          {/* Unauthorized Domain Special Help Box */}
+          {isUnauthorizedDomain && (
+            <div className="p-4 rounded-xl border border-rose-900/60 bg-rose-950/30 text-rose-200 text-xs space-y-3 shadow-lg">
+              <div className="flex items-start gap-2.5">
+                <Globe className="h-4 w-4 text-[#FACC15] shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold text-[#FACC15]">Firebase ডোমেন অনুমোদন নির্দেশিকা (Fix):</span>
+                  <p className="text-[11px] text-rose-200/90 leading-relaxed">
+                    আপনার এই ডোমেনটি Firebase Console-এ যুক্ত করতে হবে:
+                  </p>
+                </div>
+              </div>
+
+              {/* 1-Click Copy Domain Box */}
+              <div className="p-2.5 rounded-lg border border-[#333] bg-[#121212] flex items-center justify-between gap-2">
+                <span className="font-mono text-xs text-[#FACC15] font-semibold truncate">
+                  {currentHostname}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyDomain}
+                  className="px-2.5 py-1 rounded bg-[#262626] hover:bg-[#333] text-[11px] font-bold text-white flex items-center gap-1.5 shrink-0 transition-colors"
+                >
+                  {copiedDomain ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-400" />
+                      <span className="text-emerald-400">কপি হয়েছে!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>কপি করুন</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="text-[11px] text-[#A3A3A3] space-y-1 pt-1">
+                <p>১. <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-[#FACC15] underline inline-flex items-center gap-0.5">Firebase Console <ExternalLink className="h-2.5 w-2.5" /></a> ওপেন করুন।</p>
+                <p>২. <strong>Authentication &gt; Settings &gt; Authorized domains</strong>-এ যান।</p>
+                <p>৩. <strong>Add domain</strong> বাটনে ক্লিক করে উপরের ডোমেনটি পেস্ট করে Add করুন।</p>
+              </div>
+            </div>
+          )}
+
           {/* Operation Not Allowed Special Help Box */}
-          {isOperationNotAllowed && (
+          {isOperationNotAllowed && !isUnauthorizedDomain && (
             <div className="p-4 rounded-xl border border-amber-900/60 bg-amber-950/30 text-amber-200 text-xs space-y-3">
               <div className="flex items-start gap-2.5">
                 <HelpCircle className="h-4 w-4 text-[#FACC15] shrink-0 mt-0.5" />
@@ -195,7 +267,7 @@ export default function AuthLoginView({
           )}
 
           {/* General Error Message */}
-          {errorMsg && !isOperationNotAllowed && (
+          {errorMsg && !isOperationNotAllowed && !isUnauthorizedDomain && (
             <div className="p-3 rounded-xl border border-rose-900/50 bg-rose-950/40 text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
               <span>{errorMsg}</span>

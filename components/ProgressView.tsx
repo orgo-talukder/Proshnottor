@@ -92,8 +92,11 @@ export default function ProgressView({
     // Identify weakest subject
     let weakestSubject = '';
     let lowestAcc = 101;
+    let hasAttemptedAnySubject = false;
+
     Object.entries(subjectStats).forEach(([subj, data]) => {
       if (data.total > 0) {
+        hasAttemptedAnySubject = true;
         const acc = Math.round((data.correct / data.total) * 100);
         if (acc < lowestAcc) {
           lowestAcc = acc;
@@ -110,8 +113,9 @@ export default function ProgressView({
       totalTimeTakenMin: Math.round(totalTimeTaken / 60),
       subjectStats,
       topicStats,
-      weakestSubject: weakestSubject || 'পদার্থবিজ্ঞান',
-      weakestAccuracy: lowestAcc <= 100 ? lowestAcc : 64,
+      hasAttemptedAnySubject,
+      weakestSubject,
+      weakestAccuracy: lowestAcc <= 100 ? lowestAcc : 0,
     };
   }, [evaluatedAttempts, questions]);
 
@@ -193,38 +197,57 @@ export default function ProgressView({
         </div>
       </div>
 
-      {/* 3. Action Callout for Weak Area (Spec Section 52) */}
-      <div className="rounded-2xl border border-[#FACC15]/40 bg-[#0F0E08] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-[#FACC15]" />
-            <span className="text-xs font-bold uppercase tracking-wider text-[#FACC15]">
-              Weak Area Alert · দুর্বল বিষয় শনাক্তকরণ
-            </span>
+      {/* 3. Action Callout for Weak Area */}
+      {metrics.hasAttemptedAnySubject && metrics.weakestSubject ? (
+        <div className="rounded-2xl border border-[#FACC15]/40 bg-[#0F0E08] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-[#FACC15]" />
+              <span className="text-xs font-bold uppercase tracking-wider text-[#FACC15]">
+                Weak Area Alert · দুর্বল বিষয় শনাক্তকরণ
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-[#F5F5F5] mt-1">
+              {metrics.weakestSubject} Accuracy: {metrics.weakestAccuracy}%
+            </h3>
+            <p className="text-xs text-[#A3A3A3] mt-0.5">
+              পরিসংখ্যান বলছে {metrics.weakestSubject} বিষয়ে আপনার ভুল তুলনামূলক বেশি। এখনই অতিরিক্ত অনুশীলন করুন।
+            </p>
           </div>
-          <h3 className="text-base font-bold text-[#F5F5F5] mt-1">
-            {metrics.weakestSubject} Accuracy: {metrics.weakestAccuracy}%
-          </h3>
-          <p className="text-xs text-[#A3A3A3] mt-0.5">
-            পরিসংখ্যান বলছে {metrics.weakestSubject} বিষয়ে আপনার ভুল তুলনামূলক বেশি। এখনই অতিরিক্ত অনুশীলন করুন।
-          </p>
+
+          <button
+            onClick={() => onPracticeSubject(metrics.weakestSubject)}
+            className="h-10 px-5 rounded-xl bg-[#FACC15] text-black font-bold text-xs hover:bg-[#EAB308] flex items-center gap-2 transition-all shadow shrink-0"
+          >
+            <Play className="h-3.5 w-3.5 fill-black" />
+            <span>Practice {metrics.weakestSubject}</span>
+          </button>
         </div>
+      ) : (
+        <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-emerald-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                স্মার্ট পারফরম্যান্স ট্র্যাকার
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-[#F5F5F5] mt-1">
+              পরীক্ষা সম্পন্ন করার পর দুর্বল বিষয়সমূহ এখানে দৃশ্যমান হবে
+            </h3>
+            <p className="text-xs text-[#A3A3A3] mt-0.5">
+              একটি বা দুটি পূর্ণাঙ্গ MCQ পরীক্ষা সম্পন্ন করলে প্রতিটি বিষয়ের সঠিক ও ভুল উত্তরের হার স্বয়ংক্রিয়ভাবে হিসাব হবে।
+            </p>
+          </div>
+        </div>
+      )}
 
-        <button
-          onClick={() => onPracticeSubject(metrics.weakestSubject)}
-          className="h-10 px-5 rounded-xl bg-[#FACC15] text-black font-bold text-xs hover:bg-[#EAB308] flex items-center gap-2 transition-all shadow shrink-0"
-        >
-          <Play className="h-3.5 w-3.5 fill-black" />
-          <span>Practice {metrics.weakestSubject}</span>
-        </button>
-      </div>
-
-      {/* 4. Subject Performance Breakdown (Spec Section 51) */}
+      {/* 4. Subject Performance Breakdown */}
       <div className="space-y-4">
         <h2 className="text-base font-bold text-[#F5F5F5]">Subject Performance</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Object.entries(metrics.subjectStats).map(([subj, data]) => {
-            const acc = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 75;
+            const acc = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
 
             return (
               <div
@@ -236,8 +259,8 @@ export default function ProgressView({
                     <span className="text-sm font-bold text-[#F5F5F5]">{subj}</span>
                     <span className="text-xs text-[#6B6B6B]">({data.total} প্রশ্ন সমাধান)</span>
                   </div>
-                  <span className="text-sm font-bold font-mono text-emerald-400 tabular-nums">
-                    {acc}%
+                  <span className={`text-sm font-bold font-mono tabular-nums ${data.total === 0 ? 'text-[#6B6B6B]' : 'text-emerald-400'}`}>
+                    {data.total === 0 ? 'অংশ নেননি' : `${acc}%`}
                   </span>
                 </div>
 

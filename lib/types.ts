@@ -24,16 +24,25 @@ export type NavigationTab =
   | 'settings'
   | 'admin';
 
+export type UserRole = 'student' | 'admin';
+
 export interface UserProfile {
   id: string;
+  uid?: string;
   email: string;
   displayName: string;
-  role: 'student' | 'admin';
+  role: UserRole;
   institution?: string;
   targetExam?: string;
   district?: string;
   streak: number;
   avatarUrl?: string;
+  photoURL?: string;
+  totalExamsTaken?: number;
+  totalScore?: number;
+  averageAccuracy?: number;
+  weakAreas?: string[];
+  lastActiveDate?: string;
   createdAt: string;
 }
 
@@ -172,3 +181,4 @@ export interface SystemAuditLog {
   details: string;
   level: 'info' | 'warn' | 'security';
 }
+

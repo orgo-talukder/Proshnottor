@@ -30,30 +30,28 @@ import {
   AppNotification,
   ExamPreferences,
 } from '../lib/types';
-import { seedQuizzes, seedQuestions, seedQuestionKeys } from '../lib/seedData';
 import {
-  getStoredQuizzes,
-  getStoredQuestions,
-  getStoredQuestionKeys,
-  getStoredAttempts,
-  saveStoredAttempts,
   getStoredLogs,
   getStoredProfile,
   saveStoredProfile,
   getStoredPreferences,
   saveStoredPreferences,
-  getStoredBookmarks,
-  toggleBookmark,
   getStoredNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   startExamAttempt,
 } from '../lib/store';
 import {
-  fetchPublishedQuizzes,
+  subscribeToPublishedQuizzes,
+  subscribeToUserAttempts,
+  subscribeToUserBookmarks,
+  subscribeToAllQuestions,
+  subscribeToAllQuestionKeys,
+  subscribeToUserProfile,
+  syncUserProfileInFirestore,
+  ensureFirestoreInitialSeed,
   saveAttemptToFirestore,
-  fetchUserAttempts,
-  fetchUserBookmarks,
+  toggleBookmarkInFirestore,
 } from '../lib/firestore-service';
 
 interface AppMasterShellProps {
@@ -75,14 +73,16 @@ export default function AppMasterShell({
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Store data
-  const [quizzes, setQuizzes] = useState<Quiz[]>(seedQuizzes);
-  const [questions, setQuestions] = useState<Question[]>(seedQuestions);
-  const [questionKeys, setQuestionKeys] = useState<Record<string, QuestionKey>>(seedQuestionKeys);
+  // Live Cloud Firestore Data State
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questionKeys, setQuestionKeys] = useState<Record<string, QuestionKey>>({});
   const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
   const [logs, setLogs] = useState<SystemAuditLog[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [cloudProfile, setCloudProfile] = useState<UserProfile | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const [preferences, setPreferences] = useState<ExamPreferences>({
     hideTimer: false,
     confirmSubmit: true,
@@ -96,30 +96,34 @@ export default function AppMasterShell({
   const [viewingResultAttempt, setViewingResultAttempt] = useState<ExamAttempt | null>(null);
   const [instructionQuiz, setInstructionQuiz] = useState<Quiz | null>(null);
 
-  // Active profile fallback
+  // Active profile with Cloud Firestore live sync
   const currentProfile: UserProfile = useMemo(() => {
+    if (cloudProfile) return cloudProfile;
     if (authProfile) return authProfile;
     if (user) {
       return {
         id: user.uid,
+        uid: user.uid,
         email: user.email || '',
         displayName: user.displayName || user.email?.split('@')[0] || 'শিক্ষার্থী',
         role: isAdmin ? 'admin' : 'student',
         streak: 1,
-        createdAt: new Date().toISOString(),
+        totalExamsTaken: attempts.filter((a) => a.status === 'evaluated').length,
+        totalScore: attempts
+          .filter((a) => a.status === 'evaluated' && a.result)
+          .reduce((acc, curr) => acc + (curr.result?.percentage || 0), 0),
+        averageAccuracy: 0,
+        weakAreas: [],
+        lastActiveDate: '',
+        createdAt: '',
       };
     }
     return getStoredProfile();
-  }, [authProfile, user, isAdmin]);
+  }, [cloudProfile, authProfile, user, attempts, isAdmin]);
 
-  // Refresh helper
+  // Refresh local store data
   const refreshStoreData = useCallback(() => {
-    setQuizzes(getStoredQuizzes());
-    setQuestions(getStoredQuestions());
-    setQuestionKeys(getStoredQuestionKeys());
-    setAttempts(getStoredAttempts());
     setLogs(getStoredLogs());
-    setBookmarks(getStoredBookmarks());
     setNotifications(getStoredNotifications());
     setPreferences(getStoredPreferences());
     setCurrentTime(Date.now());
@@ -193,22 +197,21 @@ export default function AppMasterShell({
     return () => window.removeEventListener('popstate', handlePopState);
   }, [quizzes]);
 
-  // Initial deep link detection
+  // Real-time Firestore Subscriptions & Auto-seed initialization
   useEffect(() => {
-    async function loadData() {
+    const unsubs: (() => void)[] = [];
+
+    async function initRealtimeFirestore() {
       refreshStoreData();
 
+      // Deep link tab inspection
       if (typeof window !== 'undefined') {
         const pathname = window.location.pathname;
         const mcqMatch = pathname.match(/^\/mcq\/(.+)$/);
         const examId = initialExamId || (mcqMatch ? mcqMatch[1] : null);
 
         if (examId) {
-          const found = seedQuizzes.find((q) => q.id === examId || q.slug === examId);
-          if (found) {
-            setInstructionQuiz(found);
-            setCurrentTab('mcq');
-          }
+          setCurrentTab('mcq');
         } else if (initialTab && initialTab !== 'dashboard') {
           setCurrentTab(initialTab);
         } else {
@@ -223,27 +226,73 @@ export default function AppMasterShell({
       }
 
       try {
-        const cloudQuizzes = await fetchPublishedQuizzes();
-        if (cloudQuizzes.length > 0) {
-          setQuizzes((prev) => {
-            const map = new Map<string, Quiz>();
-            prev.forEach((q) => map.set(q.id, q));
-            cloudQuizzes.forEach((q) => map.set(q.id, q));
-            return Array.from(map.values());
-          });
-        }
+        // 1. Ensure Firestore has initial exams & questions if empty
+        await ensureFirestoreInitialSeed();
 
+        // 2. Real-time published quizzes listener
+        const unsubQuizzes = subscribeToPublishedQuizzes((liveQuizzes) => {
+          setQuizzes(liveQuizzes);
+          setDataLoading(false);
+
+          // Deep link match if examId was present in URL
+          if (typeof window !== 'undefined') {
+            const pathname = window.location.pathname;
+            const mcqMatch = pathname.match(/^\/mcq\/(.+)$/);
+            const examId = initialExamId || (mcqMatch ? mcqMatch[1] : null);
+            if (examId) {
+              const found = liveQuizzes.find((q) => q.id === examId || q.slug === examId);
+              if (found) {
+                setInstructionQuiz(found);
+                setCurrentTab('mcq');
+              }
+            }
+          }
+        });
+        unsubs.push(unsubQuizzes);
+
+        // 3. Real-time questions and answer keys listener
+        const unsubQuestions = subscribeToAllQuestions((liveQuestions) => {
+          setQuestions(liveQuestions);
+        });
+        unsubs.push(unsubQuestions);
+
+        const unsubKeys = subscribeToAllQuestionKeys((liveKeys) => {
+          setQuestionKeys(liveKeys);
+        });
+        unsubs.push(unsubKeys);
+
+        // 4. Real-time user specific attempts, bookmarks, and profile
         if (user) {
-          const userAttempts = await fetchUserAttempts(user.uid);
-          if (userAttempts.length > 0) setAttempts(userAttempts);
-          const userBms = await fetchUserBookmarks(user.uid);
-          if (userBms.length > 0) setBookmarks(userBms);
+          syncUserProfileInFirestore(user.uid, user.email || '', user.displayName || '');
+
+          const unsubAttempts = subscribeToUserAttempts(user.uid, (liveAttempts) => {
+            setAttempts(liveAttempts);
+          });
+          unsubs.push(unsubAttempts);
+
+          const unsubBookmarks = subscribeToUserBookmarks(user.uid, (liveBookmarks) => {
+            setBookmarks(liveBookmarks);
+          });
+          unsubs.push(unsubBookmarks);
+
+          const unsubProfile = subscribeToUserProfile(user.uid, (liveProfile) => {
+            if (liveProfile) setCloudProfile(liveProfile);
+          });
+          unsubs.push(unsubProfile);
         }
       } catch (err) {
-        console.warn('Background cloud fetch note:', err);
+        console.warn('Real-time Firestore initialization error:', err);
+        setDataLoading(false);
       }
     }
-    loadData();
+
+    initRealtimeFirestore();
+
+    return () => {
+      unsubs.forEach((unsub) => {
+        if (typeof unsub === 'function') unsub();
+      });
+    };
   }, [user, initialTab, initialExamId, refreshStoreData]);
 
   // Unread notifications count
@@ -260,9 +309,8 @@ export default function AppMasterShell({
   }, [attempts, currentTime]);
 
   // Discard in-progress attempt
-  const handleDiscardAttempt = (attemptId: string) => {
+  const handleDiscardAttempt = async (attemptId: string) => {
     const updated = attempts.filter((a) => a.id !== attemptId);
-    saveStoredAttempts(updated);
     setAttempts(updated);
   };
 
@@ -274,6 +322,7 @@ export default function AppMasterShell({
     );
     if (user) {
       attempt.userId = user.uid;
+      attempt.userName = user.displayName || user.email?.split('@')[0] || 'শিক্ষার্থী';
       saveAttemptToFirestore(attempt);
     }
     setActiveAttempt(attempt);
@@ -379,12 +428,25 @@ export default function AppMasterShell({
     return (
       <LiveExamRunner
         attempt={activeAttempt}
-        onFinishExam={(evaluated) => {
+        onFinishExam={async (evaluated) => {
           setActiveAttempt(null);
           setViewingResultAttempt(evaluated);
           if (user) {
             evaluated.userId = user.uid;
-            saveAttemptToFirestore(evaluated);
+            await saveAttemptToFirestore(evaluated);
+
+            // Update user profile stats in Firestore
+            const completed = [...attempts, evaluated].filter((a) => a.status === 'evaluated' && a.result);
+            const totalScore = completed.reduce((acc, curr) => acc + (curr.result?.percentage || 0), 0);
+            const avgAcc = completed.length > 0
+              ? Math.round(completed.reduce((acc, curr) => acc + (curr.result?.accuracy || 0), 0) / completed.length)
+              : 0;
+
+            await syncUserProfileInFirestore(user.uid, user.email || '', user.displayName || '', '', {
+              totalExamsTaken: completed.length,
+              totalScore,
+              averageAccuracy: avgAcc,
+            });
           }
           refreshStoreData();
         }}
@@ -475,6 +537,7 @@ export default function AppMasterShell({
             <MCQExamCatalog
               quizzes={quizzes}
               attempts={attempts}
+              loading={dataLoading}
               onStartExam={(quiz) => openExamModal(quiz)}
               onViewQuizDetails={(quiz) => openExamModal(quiz)}
               searchQuery={searchQuery}
@@ -513,8 +576,10 @@ export default function AppMasterShell({
               bookmarks={bookmarks}
               questions={questions}
               questionKeys={questionKeys}
-              onRemoveBookmark={(qId) => {
-                toggleBookmark(qId, '', '');
+              onRemoveBookmark={async (qId) => {
+                if (user) {
+                  await toggleBookmarkInFirestore(user.uid, qId, '', '');
+                }
                 refreshStoreData();
               }}
               onNavigateToExams={() => navigateToTab('mcq')}

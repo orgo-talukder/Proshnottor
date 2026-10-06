@@ -42,6 +42,8 @@ import {
   Lock,
   KeyRound,
   CheckCircle2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -77,6 +79,7 @@ export default function AdminPortal({
   const [reauthPassword, setReauthPassword] = useState('');
   const [reauthError, setReauthError] = useState('');
   const [reauthLoading, setReauthLoading] = useState(false);
+  const [showReauthPassword, setShowReauthPassword] = useState(false);
 
   // Question Creation Form State
   const [newStem, setNewStem] = useState('');
@@ -418,13 +421,21 @@ export default function AdminPortal({
               <div className="relative">
                 <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
                 <input
-                  type="password"
+                  type={showReauthPassword ? 'text' : 'password'}
                   value={reauthPassword}
                   onChange={(e) => setReauthPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full h-10 pl-9 pr-3 rounded-xl border border-[#262626] bg-[#121212] text-xs text-[#F5F5F5] placeholder-[#444] outline-none focus:border-[#FACC15]"
+                  className="w-full h-10 pl-9 pr-10 rounded-xl border border-[#262626] bg-[#121212] text-xs text-[#F5F5F5] placeholder-[#444] outline-none focus:border-[#FACC15]"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowReauthPassword(!showReauthPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[#F5F5F5] p-1 transition-colors"
+                  title={showReauthPassword ? 'পাসওয়ার্ড গোপন করুন' : 'পাসওয়ার্ড দেখুন'}
+                >
+                  {showReauthPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
