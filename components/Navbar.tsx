@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ShieldCheck, UserCheck, BookOpen, Clock, BarChart3, Settings } from 'lucide-react';
-import { getStoredUserRole, setStoredUserRole, getStoredFontScale, setStoredFontScale } from '../lib/store';
+import { ShieldCheck, UserCheck } from 'lucide-react';
+import { setStoredUserRole, setStoredFontScale } from '../lib/store';
 
 interface NavbarProps {
   currentTab: 'home' | 'mocks' | 'quizzes' | 'history' | 'admin';
@@ -63,8 +63,8 @@ export default function Navbar({
           </button>
         </div>
 
-        {/* Zone 2: Navigation Links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+        {/* Zone 2: Navigation tabs with clear active indicators */}
+        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
           <button
             onClick={() => onSelectTab('home')}
             className={`transition-colors whitespace-nowrap pb-1 ${
@@ -115,7 +115,11 @@ export default function Navbar({
           >
             অ্যাডমিন প্যানেল
             {userRole === 'admin' && (
-              <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E]" title="অ্যাডমিন সক্রিয়" />
+              <span
+                suppressHydrationWarning
+                className="h-1.5 w-1.5 rounded-full bg-[#22C55E]"
+                title="অ্যাডমিন সক্রিয়"
+              />
             )}
           </button>
         </nav>

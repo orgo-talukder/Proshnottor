@@ -7,8 +7,14 @@ import {
   ExamAttempt,
   ExamEvaluationResult,
   SystemAuditLog,
+  Bookmark,
+  AppNotification,
+  UserProfile,
+  ExamPreferences,
 } from './types';
 import { seedQuestions, seedQuestionKeys, seedQuizzes } from './seedData';
+import { db, auth, handleFirestoreError, OperationType } from './firebase';
+import { doc, setDoc, getDoc, collection, addDoc, getDocs } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   QUESTIONS: 'proshnottor_questions_v1',
@@ -18,6 +24,62 @@ const STORAGE_KEYS = {
   LOGS: 'proshnottor_logs_v1',
   CURRENT_ROLE: 'proshnottor_role_v1',
   FONT_SCALE: 'proshnottor_font_scale_v1',
+  BOOKMARKS: 'proshnottor_bookmarks_v1',
+  NOTIFICATIONS: 'proshnottor_notifications_v1',
+  PROFILE: 'proshnottor_profile_v1',
+  PREFERENCES: 'proshnottor_preferences_v1',
+};
+
+// Default profile
+const defaultProfile: UserProfile = {
+  id: 'usr-student-01',
+  email: 'argotalukder70@gmail.com',
+  displayName: 'Argo Talukder',
+  role: 'student',
+  institution: 'ঢাকা বিশ্ববিদ্যালয় (University of Dhaka)',
+  targetExam: '47th BCS & Job Recruitment',
+  district: 'Dhaka',
+  streak: 7,
+  createdAt: '2026-03-01',
+};
+
+// Default notifications
+const initialNotifications: AppNotification[] = [
+  {
+    id: 'notif-1',
+    title: 'নতুন মক টেস্ট প্রকাশিত হয়েছে',
+    message: 'BCS Preliminary Model Test 01 এখন লাইভ। এখনই অংশগ্রহণ করুন।',
+    timestamp: '১০ মিনিট আগে',
+    read: false,
+    type: 'exam',
+    linkTab: 'mcq_exam',
+  },
+  {
+    id: 'notif-2',
+    title: '৭ দিনের স্ট্রিক সম্পন্ন!',
+    message: 'অভিনন্দন! আপনি টানা ৭ দিন সফলভাবে কুইজ অনুশীলন করেছেন।',
+    timestamp: '২ ঘণ্টা আগে',
+    read: false,
+    type: 'streak',
+    linkTab: 'progress',
+  },
+  {
+    id: 'notif-3',
+    title: 'সিস্টেম আপডেট v2.0',
+    message: 'Pure Black OLED ড্যাশবোর্ড এবং রিয়েলটাইম ফায়ারবেস ক্লাউড ব্যাকআপ যুক্ত করা হয়েছে।',
+    timestamp: '১ দিন আগে',
+    read: true,
+    type: 'system',
+    linkTab: 'dashboard',
+  },
+];
+
+// Default preferences
+const defaultPreferences: ExamPreferences = {
+  hideTimer: false,
+  confirmSubmit: true,
+  fontScale: 'md',
+  soundEnabled: true,
 };
 
 // Memory fallback for SSR / Hydration
@@ -25,13 +87,26 @@ let memoryQuestions: Question[] = [...seedQuestions];
 let memoryKeys: Record<string, QuestionKey> = { ...seedQuestionKeys };
 let memoryQuizzes: Quiz[] = [...seedQuizzes];
 let memoryAttempts: ExamAttempt[] = [];
+let memoryBookmarks: Bookmark[] = [
+  {
+    id: 'bm-1',
+    userId: 'usr-student-01',
+    questionId: 'q-math-01',
+    subject: 'সাধারণ গণিত',
+    topic: 'বীজগণিতিক অনুপাত',
+    savedAt: Date.now() - 3600000 * 24,
+  },
+];
+let memoryNotifications: AppNotification[] = [...initialNotifications];
+let memoryProfile: UserProfile = { ...defaultProfile };
+let memoryPreferences: ExamPreferences = { ...defaultPreferences };
 let memoryLogs: SystemAuditLog[] = [
   {
     id: 'log-1',
     action: 'SYSTEM_BOOT',
     user: 'system',
-    timestamp: new Date().toLocaleTimeString('bn-BD'),
-    details: 'Pure Black Exam Engine এবং ডাটাবেস প্রস্তুত হয়েছে',
+    timestamp: '১০:০০ AM',
+    details: 'Pure Black Exam Engine এবং ফায়ারবেস ক্লাউড সিঙ্ক প্রস্তুত হয়েছে',
     level: 'info',
   },
 ];
@@ -137,6 +212,159 @@ export function saveStoredAttempts(attempts: ExamAttempt[]) {
   }
 }
 
+// -------------------------------------------------------------
+// Bookmarks Store
+// -------------------------------------------------------------
+
+export function getStoredBookmarks(): Bookmark[] {
+  if (!isBrowser()) return memoryBookmarks;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.BOOKMARKS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify(memoryBookmarks));
+      return memoryBookmarks;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return memoryBookmarks;
+  }
+}
+
+export function toggleBookmark(questionId: string, subject: string, topic: string): boolean {
+  const current = getStoredBookmarks();
+  const exists = current.some((b) => b.questionId === questionId);
+  let updated: Bookmark[];
+  let isSaved = false;
+
+  if (exists) {
+    updated = current.filter((b) => b.questionId !== questionId);
+    isSaved = false;
+  } else {
+    const newBm: Bookmark = {
+      id: `bm-${Date.now()}`,
+      userId: getStoredProfile().id,
+      questionId,
+      subject,
+      topic,
+      savedAt: Date.now(),
+    };
+    updated = [newBm, ...current];
+    isSaved = true;
+  }
+
+  memoryBookmarks = updated;
+  if (isBrowser()) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.BOOKMARKS, JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return isSaved;
+}
+
+export function isQuestionBookmarked(questionId: string): boolean {
+  const current = getStoredBookmarks();
+  return current.some((b) => b.questionId === questionId);
+}
+
+// -------------------------------------------------------------
+// Notifications Store
+// -------------------------------------------------------------
+
+export function getStoredNotifications(): AppNotification[] {
+  if (!isBrowser()) return memoryNotifications;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(memoryNotifications));
+      return memoryNotifications;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return memoryNotifications;
+  }
+}
+
+export function markNotificationRead(id: string) {
+  const notifs = getStoredNotifications().map((n) => (n.id === id ? { ...n, read: true } : n));
+  memoryNotifications = notifs;
+  if (isBrowser()) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifs));
+    } catch {}
+  }
+}
+
+export function markAllNotificationsRead() {
+  const notifs = getStoredNotifications().map((n) => ({ ...n, read: true }));
+  memoryNotifications = notifs;
+  if (isBrowser()) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifs));
+    } catch {}
+  }
+}
+
+// -------------------------------------------------------------
+// Profile Store
+// -------------------------------------------------------------
+
+export function getStoredProfile(): UserProfile {
+  if (!isBrowser()) return memoryProfile;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(memoryProfile));
+      return memoryProfile;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return memoryProfile;
+  }
+}
+
+export function saveStoredProfile(profile: UserProfile) {
+  memoryProfile = profile;
+  if (isBrowser()) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+      addAuditLog('PROFILE_UPDATED', `প্রোফাইল তথ্য আপডেট করা হয়েছে (${profile.displayName})`);
+    } catch {}
+  }
+}
+
+// -------------------------------------------------------------
+// Preferences Store
+// -------------------------------------------------------------
+
+export function getStoredPreferences(): ExamPreferences {
+  if (!isBrowser()) return memoryPreferences;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PREFERENCES);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.PREFERENCES, JSON.stringify(memoryPreferences));
+      return memoryPreferences;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return memoryPreferences;
+  }
+}
+
+export function saveStoredPreferences(prefs: ExamPreferences) {
+  memoryPreferences = prefs;
+  if (isBrowser()) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PREFERENCES, JSON.stringify(prefs));
+    } catch {}
+  }
+}
+
+// -------------------------------------------------------------
+// Audit Logs
+// -------------------------------------------------------------
+
 export function addAuditLog(action: string, details: string, level: 'info' | 'warn' | 'security' = 'info') {
   const newLog: SystemAuditLog = {
     id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -150,10 +378,23 @@ export function addAuditLog(action: string, details: string, level: 'info' | 'wa
   if (isBrowser()) {
     try {
       localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(memoryLogs));
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
+
+  // Cloud backup to Firestore
+  try {
+    if (auth.currentUser) {
+      const path = 'logs';
+      addDoc(collection(db, path), {
+        action: newLog.action,
+        user: newLog.user,
+        timestamp: newLog.timestamp,
+        details: newLog.details,
+        level: newLog.level,
+        createdAt: new Date().toISOString(),
+      }).catch((err) => handleFirestoreError(err, OperationType.CREATE, path));
+    }
+  } catch {}
 }
 
 export function getStoredLogs(): SystemAuditLog[] {
@@ -161,16 +402,15 @@ export function getStoredLogs(): SystemAuditLog[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.LOGS);
     if (raw) return JSON.parse(raw);
-  } catch {
-    // fallback
-  }
+  } catch {}
   return memoryLogs;
 }
 
 export function getStoredUserRole(): 'student' | 'admin' {
   if (!isBrowser()) return 'student';
   try {
-    return (localStorage.getItem(STORAGE_KEYS.CURRENT_ROLE) as 'student' | 'admin') || 'student';
+    const prof = getStoredProfile();
+    return prof.role || 'student';
   } catch {
     return 'student';
   }
@@ -179,18 +419,19 @@ export function getStoredUserRole(): 'student' | 'admin' {
 export function setStoredUserRole(role: 'student' | 'admin') {
   if (isBrowser()) {
     try {
+      const prof = getStoredProfile();
+      const updated = { ...prof, role };
+      saveStoredProfile(updated);
       localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, role);
-      addAuditLog('ROLE_SWITCH', `ইউজার রোল পরিবর্তিত হয়েছে: ${role === 'admin' ? 'অ্যাডমিন' : 'শিক্ষার্থী'}`);
-    } catch {
-      // ignore
-    }
+      addAuditLog('ROLE_SWITCH', `রোল সুইচ করা হয়েছে: ${role === 'admin' ? 'Admin (এডমিন)' : 'Student (শিক্ষার্থী)'}`);
+    } catch {}
   }
 }
 
 export function getStoredFontScale(): 'sm' | 'md' | 'lg' | 'xl' {
   if (!isBrowser()) return 'md';
   try {
-    return (localStorage.getItem(STORAGE_KEYS.FONT_SCALE) as any) || 'md';
+    return getStoredPreferences().fontScale;
   } catch {
     return 'md';
   }
@@ -199,10 +440,9 @@ export function getStoredFontScale(): 'sm' | 'md' | 'lg' | 'xl' {
 export function setStoredFontScale(scale: 'sm' | 'md' | 'lg' | 'xl') {
   if (isBrowser()) {
     try {
-      localStorage.setItem(STORAGE_KEYS.FONT_SCALE, scale);
-    } catch {
-      // ignore
-    }
+      const prefs = getStoredPreferences();
+      saveStoredPreferences({ ...prefs, fontScale: scale });
+    } catch {}
   }
 }
 
@@ -210,7 +450,7 @@ export function setStoredFontScale(scale: 'sm' | 'md' | 'lg' | 'xl') {
 // Exam Lifecycle & Evaluation Engine
 // -------------------------------------------------------------
 
-export function startExamAttempt(quiz: Quiz, userName = 'শিক্ষার্থী'): ExamAttempt {
+export function startExamAttempt(quiz: Quiz, userName = 'Argo Talukder'): ExamAttempt {
   const now = Date.now();
   const durationMs = quiz.settings.durationMinutes * 60 * 1000;
   const token = `e-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
@@ -240,7 +480,7 @@ export function startExamAttempt(quiz: Quiz, userName = 'শিক্ষার�
   const attempt: ExamAttempt = {
     id: `att-${Date.now()}`,
     token,
-    userId: 'usr-student-01',
+    userId: getStoredProfile().id,
     userName,
     quizId: quiz.id,
     quizTitle: quiz.title,
@@ -258,6 +498,15 @@ export function startExamAttempt(quiz: Quiz, userName = 'শিক্ষার�
   const attempts = getStoredAttempts();
   saveStoredAttempts([attempt, ...attempts]);
   addAuditLog('EXAM_STARTED', `পরীক্ষা শুরু হয়েছে: ${quiz.title} (টোকেন: ${token})`);
+
+  // Async Firestore backup
+  if (auth.currentUser) {
+    const path = `attempts/${attempt.id}`;
+    setDoc(doc(db, 'attempts', attempt.id), {
+      ...attempt,
+      cloudSyncedAt: new Date().toISOString(),
+    }).catch((err) => handleFirestoreError(err, OperationType.WRITE, path));
+  }
 
   return attempt;
 }
@@ -335,7 +584,6 @@ export function evaluateAttempt(attemptId: string, reason: 'manual' | 'timeout' 
       isCorrect = false;
       marksAwarded = 0;
     } else {
-      // Check if selected matches correct options
       const sortedUser = [...userSelected].sort().join(',');
       const sortedCorrect = [...correctOptions].sort().join(',');
 
@@ -395,6 +643,17 @@ export function evaluateAttempt(attemptId: string, reason: 'manual' | 'timeout' 
     'EXAM_SUBMITTED',
     `পরীক্ষা জমা দেওয়া হয়েছে (${reason}): ${attempt.quizTitle} - প্রাপ্ত স্কোর: ${finalScore}/${totalMarks}`
   );
+
+  // Sync evaluated attempt to Firestore
+  if (auth.currentUser) {
+    const path = `attempts/${attempt.id}`;
+    setDoc(doc(db, 'attempts', attempt.id), {
+      ...attempt,
+      submittedAt: attempt.submittedAt,
+      result: attempt.result,
+      cloudSyncedAt: new Date().toISOString(),
+    }).catch((err) => handleFirestoreError(err, OperationType.UPDATE, path));
+  }
 
   return attempt;
 }

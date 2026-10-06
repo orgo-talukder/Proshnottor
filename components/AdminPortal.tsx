@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Question,
   QuestionKey,
@@ -20,17 +20,18 @@ import {
   Upload,
   BookOpen,
   HelpCircle,
-  FileText,
-  ListFilter,
+  Users,
+  Search,
   Check,
-  Eye,
   Trash2,
-  Clock,
-  Award,
   Layers,
   Activity,
   AlertCircle,
   Sparkles,
+  Shield,
+  ShieldAlert,
+  UserX,
+  UserCheck,
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -42,6 +43,15 @@ interface AdminPortalProps {
   onDataUpdated: () => void;
 }
 
+interface MockUser {
+  uid: string;
+  name: string;
+  email: string;
+  role: 'student' | 'admin';
+  status: 'active' | 'blocked';
+  attemptsCount: number;
+}
+
 export default function AdminPortal({
   questions,
   questionKeys,
@@ -50,7 +60,7 @@ export default function AdminPortal({
   logs,
   onDataUpdated,
 }: AdminPortalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'questions' | 'quizzes' | 'bulk' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'questions' | 'quizzes' | 'users' | 'bulk' | 'logs'>('overview');
 
   // Question Creation Form State
   const [newStem, setNewStem] = useState('');
@@ -63,7 +73,7 @@ export default function AdminPortal({
   const [optD, setOptD] = useState('');
   const [correctOptionIdx, setCorrectOptionIdx] = useState(0);
   const [newExplanation, setNewExplanation] = useState('');
-  const [showPreview, setShowPreview] = useState(true);
+  const [questionSearch, setQuestionSearch] = useState('');
 
   // New Quiz Creation State
   const [newQuizTitle, setNewQuizTitle] = useState('');
@@ -78,7 +88,16 @@ export default function AdminPortal({
   const [bulkInput, setBulkInput] = useState('');
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
 
-  // Calculate Overview Stats
+  // Mock Users State (Section 50)
+  const [userList, setUserList] = useState<MockUser[]>([
+    { uid: 'u-1', name: 'রাফি আহমেদ', email: 'rafi@example.com', role: 'student', status: 'active', attemptsCount: 5 },
+    { uid: 'u-2', name: 'তানিয়া সুলতানা', email: 'tania@admin.edu.bd', role: 'admin', status: 'active', attemptsCount: 12 },
+    { uid: 'u-3', name: 'সাকিব হাসান', email: 'sakib77@gmail.com', role: 'student', status: 'active', attemptsCount: 2 },
+    { uid: 'u-4', name: 'ফারহানা ইসলাম', email: 'farhana.du@gmail.com', role: 'student', status: 'blocked', attemptsCount: 1 },
+  ]);
+  const [userSearch, setUserSearch] = useState('');
+
+  // Calculate Overview Stats (Section 42)
   const totalQuestions = questions.length;
   const totalQuizzes = quizzes.length;
   const totalAttempts = attempts.length;
@@ -89,7 +108,64 @@ export default function AdminPortal({
         )
       : 0;
 
-  // Add Question Handler
+  // Filtered Questions for Question Bank Table (Section 43)
+  const filteredQuestions = useMemo(() => {
+    if (!questionSearch.trim()) return questions;
+    const q = questionSearch.toLowerCase();
+    return questions.filter(
+      (item) =>
+        item.stem.toLowerCase().includes(q) ||
+        item.subject.toLowerCase().includes(q) ||
+        item.topic.toLowerCase().includes(q)
+    );
+  }, [questions, questionSearch]);
+
+  // Delete question
+  const handleDeleteQuestion = (qId: string) => {
+    if (confirm('আপনি কি এই প্রশ্নটি প্রশ্নব্যাংক থেকে মুছে ফেলতে চান?')) {
+      const updated = questions.filter((q) => q.id !== qId);
+      const updatedKeys = { ...questionKeys };
+      delete updatedKeys[qId];
+      saveStoredQuestions(updated);
+      saveStoredQuestionKeys(updatedKeys);
+      addAuditLog('QUESTION_DELETED', `প্রশ্ন মুছে ফেলা হয়েছে (ID: ${qId})`, 'warn');
+      onDataUpdated();
+    }
+  };
+
+  // Toggle Quiz Status
+  const handleToggleQuizStatus = (quizId: string) => {
+    const updated = quizzes.map((q) => {
+      if (q.id === quizId) {
+        const nextStatus = q.status === 'published' ? 'draft' : 'published';
+        return { ...q, status: nextStatus as any };
+      }
+      return q;
+    });
+    saveStoredQuizzes(updated);
+    addAuditLog('QUIZ_STATUS_TOGGLE', `পরীক্ষার স্ট্যাটাস পরিবর্তিত হয়েছে: ${quizId}`);
+    onDataUpdated();
+  };
+
+  // Toggle User Block Status (Section 50)
+  const handleToggleUserBlock = (uid: string) => {
+    setUserList((prev) =>
+      prev.map((u) => {
+        if (u.uid === uid) {
+          const nextStatus = u.status === 'active' ? 'blocked' : 'active';
+          addAuditLog(
+            'USER_STATUS_CHANGE',
+            `ইউজার ${u.name} (${u.email}) স্ট্যাটাস: ${nextStatus === 'blocked' ? 'ব্লকড' : 'সক্রিয়'} করা হয়েছে`,
+            nextStatus === 'blocked' ? 'security' : 'info'
+          );
+          return { ...u, status: nextStatus };
+        }
+        return u;
+      })
+    );
+  };
+
+  // Add Question Handler (Section 44, 45)
   const handleCreateQuestion = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStem.trim() || !optA.trim() || !optB.trim() || !optC.trim() || !optD.trim()) {
@@ -141,7 +217,7 @@ export default function AdminPortal({
     onDataUpdated();
   };
 
-  // Create Quiz Handler
+  // Create Quiz Handler (Section 47, 48)
   const handleCreateQuiz = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuizTitle.trim() || selectedQuestionIds.length === 0) {
@@ -187,7 +263,7 @@ export default function AdminPortal({
     onDataUpdated();
   };
 
-  // Bulk Import Handler
+  // Bulk Import Handler (Section 46)
   const handleBulkImport = () => {
     try {
       const parsed = JSON.parse(bulkInput);
@@ -245,7 +321,6 @@ export default function AdminPortal({
     }
   };
 
-  // Sample JSON Template for user
   const sampleTemplate = `[
   {
     "stem": "যদি $a^2 + b^2 = 25$ এবং $ab = 12$ হয়, তবে $(a+b)^2$-এর মান কত?",
@@ -261,73 +336,81 @@ export default function AdminPortal({
   return (
     <div className="min-h-screen bg-[#000000] text-[#F5F5F5] py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
+        {/* Admin Header (Section 39, 40) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#262626]">
           <div>
             <div className="flex items-center gap-2 text-xs text-[#FACC15] font-semibold mb-1">
               <Layers className="h-4 w-4" />
-              <span>এডমিনিস্ট্রেটিভ ম্যানেজমেন্ট</span>
+              <span>Admin Console · Task-First & Data-First</span>
             </div>
             <h1 className="text-2xl font-bold text-[#F5F5F5]">
               প্রশ্নোত্তর অ্যাডমিন কন্ট্রোল প্যানেল
             </h1>
             <p className="text-xs text-[#A3A3A3] mt-1">
-              প্রশ্নব্যাংক সমৃদ্ধকরণ, LaTeX সমীকরণ প্রিভিউ, মক পরীক্ষা কনফিগারেশন এবং লাইভ অডিট ট্র্যাকিং।
+              প্রশ্নব্যাংক ম্যানেজমেন্ট, KaTeX সমীকরণ লাইভ প্রিভিউ, পরীক্ষা কনফিগারেশন ও অডিট ট্র্যাকিং।
             </p>
           </div>
 
-          {/* Navigation Tabs */}
+          {/* Navigation Tabs (Section 40) */}
           <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                activeTab === 'overview' ? 'bg-[#FACC15] text-black font-bold' : 'text-[#A3A3A3] hover:text-white'
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-lg font-semibold transition-colors ${
+                activeTab === 'overview' ? 'bg-[#FACC15] text-black' : 'text-[#A3A3A3] hover:text-white'
               }`}
             >
               ওভারভিউ
             </button>
             <button
               onClick={() => setActiveTab('questions')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                activeTab === 'questions' ? 'bg-[#FACC15] text-black font-bold' : 'text-[#A3A3A3] hover:text-white'
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-lg font-semibold transition-colors ${
+                activeTab === 'questions' ? 'bg-[#FACC15] text-black' : 'text-[#A3A3A3] hover:text-white'
               }`}
             >
-              প্রশ্ন যোগ (LaTeX)
+              প্রশ্নব্যাংক ({questions.length})
             </button>
             <button
               onClick={() => setActiveTab('quizzes')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                activeTab === 'quizzes' ? 'bg-[#FACC15] text-black font-bold' : 'text-[#A3A3A3] hover:text-white'
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-lg font-semibold transition-colors ${
+                activeTab === 'quizzes' ? 'bg-[#FACC15] text-black' : 'text-[#A3A3A3] hover:text-white'
               }`}
             >
-              পরীক্ষা তৈরি
+              পরীক্ষা ({quizzes.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-lg font-semibold transition-colors ${
+                activeTab === 'users' ? 'bg-[#FACC15] text-black' : 'text-[#A3A3A3] hover:text-white'
+              }`}
+            >
+              ইউজার ({userList.length})
             </button>
             <button
               onClick={() => setActiveTab('bulk')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                activeTab === 'bulk' ? 'bg-[#FACC15] text-black font-bold' : 'text-[#A3A3A3] hover:text-white'
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-lg font-semibold transition-colors ${
+                activeTab === 'bulk' ? 'bg-[#FACC15] text-black' : 'text-[#A3A3A3] hover:text-white'
               }`}
             >
               বাল্ক ইমপোর্ট
             </button>
             <button
               onClick={() => setActiveTab('logs')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                activeTab === 'logs' ? 'bg-[#FACC15] text-black font-bold' : 'text-[#A3A3A3] hover:text-white'
+              className={`min-h-[38px] px-3.5 py-1.5 rounded-lg font-semibold transition-colors ${
+                activeTab === 'logs' ? 'bg-[#FACC15] text-black' : 'text-[#A3A3A3] hover:text-white'
               }`}
             >
-              সিস্টেম লগ ({logs.length})
+              লগ ({logs.length})
             </button>
           </div>
         </div>
 
-        {/* Tab 1: Overview */}
+        {/* Tab 1: Overview (Section 42) */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-5">
                 <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                  <HelpCircle className="h-4 w-4 text-[#FACC15]" /> প্রশ্নব্যাংকে মোট প্রশ্ন
+                  <HelpCircle className="h-4 w-4 text-[#FACC15]" /> মোট প্রশ্ন
                 </span>
                 <span className="mt-2 block text-3xl font-extrabold font-mono text-[#F5F5F5]">
                   {totalQuestions}
@@ -335,7 +418,7 @@ export default function AdminPortal({
               </div>
               <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-5">
                 <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                  <BookOpen className="h-4 w-4 text-sky-400" /> প্রকাশিত পরীক্ষা
+                  <BookOpen className="h-4 w-4 text-sky-400" /> সক্রিয় পরীক্ষা
                 </span>
                 <span className="mt-2 block text-3xl font-extrabold font-mono text-[#F5F5F5]">
                   {totalQuizzes}
@@ -343,7 +426,7 @@ export default function AdminPortal({
               </div>
               <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-5">
                 <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                  <Activity className="h-4 w-4 text-emerald-400" /> মোট পরীক্ষার্থী সেশন
+                  <Activity className="h-4 w-4 text-emerald-400" /> পরীক্ষার্থী সেশন
                 </span>
                 <span className="mt-2 block text-3xl font-extrabold font-mono text-[#F5F5F5]">
                   {totalAttempts}
@@ -351,7 +434,7 @@ export default function AdminPortal({
               </div>
               <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-5">
                 <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                  <Award className="h-4 w-4 text-purple-400" /> গড় অর্জিত স্কোর
+                  <Users className="h-4 w-4 text-purple-400" /> গড় স্কোর
                 </span>
                 <span className="mt-2 block text-3xl font-extrabold font-mono text-[#FACC15]">
                   {avgScore}%
@@ -359,22 +442,22 @@ export default function AdminPortal({
               </div>
             </div>
 
-            {/* Recent Attempts History Table */}
+            {/* Recent Attempts Log Table */}
             <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6">
               <h3 className="text-sm font-bold text-[#F5F5F5] mb-4">
-                সাম্প্রতিক পরীক্ষার ফলাফল ও জমা রেকর্ড ({attempts.length})
+                সাম্প্রতিক পরীক্ষার রেকর্ড ও জমা ({attempts.length})
               </h3>
               {attempts.length === 0 ? (
                 <div className="text-center py-8 text-xs text-[#A3A3A3]">
-                  এখনো কোনো পরীক্ষা সম্পন্ন হয়নি। ছাত্র মোডে যেয়ে পরীক্ষা দিন!
+                  এখনো কোনো পরীক্ষা সম্পন্ন হয়নি।
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-[#262626] text-[#A3A3A3]">
-                        <th className="pb-3 font-medium">পরীক্ষার নাম</th>
-                        <th className="pb-3 font-medium">তারিখ/সময়</th>
+                        <th className="pb-3 font-medium">পরীক্ষা</th>
+                        <th className="pb-3 font-medium">সময়</th>
                         <th className="pb-3 font-medium">স্কোর</th>
                         <th className="pb-3 font-medium">নির্ভুলতা</th>
                         <th className="pb-3 font-medium">স্ট্যাটাস</th>
@@ -408,172 +491,264 @@ export default function AdminPortal({
           </div>
         )}
 
-        {/* Tab 2: Question Creation with Live KaTeX Preview */}
+        {/* Tab 2: Question Creator + Question Bank Table (Section 43, 44, 45) */}
         {activeTab === 'questions' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Form */}
-            <form onSubmit={handleCreateQuestion} className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6 space-y-4">
-              <h3 className="text-base font-bold text-[#F5F5F5] flex items-center gap-2">
-                <Plus className="h-4 w-4 text-[#FACC15]" />
-                <span>নতুন প্রশ্ন যুক্ত করুন</span>
-              </h3>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Form */}
+              <form onSubmit={handleCreateQuestion} className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6 space-y-4">
+                <h3 className="text-base font-bold text-[#F5F5F5] flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-[#FACC15]" />
+                  <span>নতুন প্রশ্ন তৈরি (KaTeX সমীকরণ সমর্থিত)</span>
+                </h3>
 
-              {/* Subject & Topic */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-[#A3A3A3] mb-1">বিষয়</label>
-                  <input
-                    type="text"
-                    value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value)}
-                    className="w-full rounded-lg border border-[#333] bg-[#000000] px-3 py-2 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
-                    placeholder="যেমন: গাণিতিক যুক্তি"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-[#A3A3A3] mb-1">টপিক</label>
-                  <input
-                    type="text"
-                    value={newTopic}
-                    onChange={(e) => setNewTopic(e.target.value)}
-                    className="w-full rounded-lg border border-[#333] bg-[#000000] px-3 py-2 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
-                    placeholder="যেমন: অনুপাত ও শতাংশ"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Question Stem */}
-              <div>
-                <label className="block text-xs text-[#A3A3A3] mb-1">
-                  প্রশ্নের মূল বক্তব্য (LaTeX সমর্থিত: $ সূত্র $ অথবা $$ সূত্র $$)
-                </label>
-                <textarea
-                  rows={3}
-                  value={newStem}
-                  onChange={(e) => setNewStem(e.target.value)}
-                  className="w-full rounded-lg border border-[#333] bg-[#000000] p-3 text-xs sm:text-sm text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
-                  placeholder="যেমন: একটি সংখ্যার বর্গ $x^2 = 144$ হলে, $x$-এর মান কত?"
-                  required
-                />
-              </div>
-
-              {/* Options */}
-              <div className="space-y-2.5">
-                <label className="block text-xs text-[#A3A3A3]">
-                  অপশনসমূহ ও সঠিক উত্তর নির্বাচন করুন:
-                </label>
-                {[
-                  { label: 'ক', val: optA, set: setOptA, idx: 0 },
-                  { label: 'খ', val: optB, set: setOptB, idx: 1 },
-                  { label: 'গ', val: optC, set: setOptC, idx: 2 },
-                  { label: 'ঘ', val: optD, set: setOptD, idx: 3 },
-                ].map((opt) => (
-                  <div key={opt.idx} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="correct-option"
-                      checked={correctOptionIdx === opt.idx}
-                      onChange={() => setCorrectOptionIdx(opt.idx)}
-                      className="text-[#FACC15] focus:ring-[#FACC15] cursor-pointer"
-                      title="সঠিক উত্তর হিসেবে চিহ্নিত করুন"
-                    />
-                    <span className="text-xs font-mono font-bold text-[#FACC15]">{opt.label}.</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-[#A3A3A3] mb-1">বিষয়</label>
                     <input
                       type="text"
-                      value={opt.val}
-                      onChange={(e) => opt.set(e.target.value)}
-                      className="flex-1 rounded-lg border border-[#333] bg-[#000000] px-3 py-1.5 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
-                      placeholder={`অপশন ${opt.label} (LaTeX সমর্থিত)`}
+                      value={newSubject}
+                      onChange={(e) => setNewSubject(e.target.value)}
+                      className="min-h-[40px] w-full rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
                       required
                     />
                   </div>
-                ))}
-              </div>
-
-              {/* Explanation */}
-              <div>
-                <label className="block text-xs text-[#A3A3A3] mb-1">
-                  বিস্তারিত সমাধান ও ব্যাখ্যা (LaTeX সমর্থিত)
-                </label>
-                <textarea
-                  rows={2}
-                  value={newExplanation}
-                  onChange={(e) => setNewExplanation(e.target.value)}
-                  className="w-full rounded-lg border border-[#333] bg-[#000000] p-3 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
-                  placeholder="ধাপে ধাপে সমাধান..."
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-[#FACC15] py-2.5 text-xs font-bold text-black hover:bg-[#EAB308] active:scale-[0.98] transition-all"
-              >
-                প্রশ্নব্যাংকে যুক্ত করুন
-              </button>
-            </form>
-
-            {/* Live KaTeX Preview Box */}
-            <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6 flex flex-col">
-              <div className="flex items-center justify-between pb-3 border-b border-[#222] mb-4">
-                <h3 className="text-xs font-bold text-[#F5F5F5] flex items-center gap-2">
-                  <Sparkles className="h-3.5 w-3.5 text-[#FACC15]" />
-                  লাইভ প্রিভিউ (শিক্ষার্থীরা যেভাবে দেখবে)
-                </h3>
-                <span className="text-[10px] text-emerald-400 font-mono">KaTeX Active</span>
-              </div>
-
-              <div className="flex-1 rounded-lg border border-[#222] bg-[#000000] p-4 text-xs space-y-4">
-                <div>
-                  <span className="text-[10px] text-[#A3A3A3] block mb-1">
-                    {newSubject} · {newTopic}
-                  </span>
-                  <div className="text-sm font-semibold text-[#F5F5F5]">
-                    {newStem ? <MathText content={newStem} /> : <span className="text-[#555]">প্রশ্ন লিখলে এখানে লাইভ দেখতে পাবেন...</span>}
+                  <div>
+                    <label className="block text-xs text-[#A3A3A3] mb-1">টপিক</label>
+                    <input
+                      type="text"
+                      value={newTopic}
+                      onChange={(e) => setNewTopic(e.target.value)}
+                      className="min-h-[40px] w-full rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
+                      required
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  {[optA, optB, optC, optD].map((optText, i) => (
-                    <div
-                      key={i}
-                      className={`p-2 rounded border text-xs flex items-center gap-2 ${
-                        correctOptionIdx === i
-                          ? 'border-[#22C55E] bg-emerald-950/20 text-emerald-300'
-                          : 'border-[#262626] text-[#A3A3A3]'
-                      }`}
-                    >
-                      <span className="font-mono font-bold">
-                        {['ক', 'খ', 'গ', 'ঘ'][i]}.
-                      </span>
-                      <div className="flex-1">
-                        {optText ? <MathText content={optText} /> : <span className="text-[#555]">-</span>}
-                      </div>
-                      {correctOptionIdx === i && (
-                        <span className="text-[10px] text-emerald-400 font-bold">✓ সঠিক</span>
-                      )}
+                <div>
+                  <label className="block text-xs text-[#A3A3A3] mb-1">
+                    প্রশ্ন (LaTeX ম্যাথ: $ সমীকরণ $ বা $$ সমীকরণ $$)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newStem}
+                    onChange={(e) => setNewStem(e.target.value)}
+                    className="w-full rounded-lg border border-[#333] bg-[#000000] p-3 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
+                    placeholder="যেমন: সমীকরণ $x^2 + 5x + 6 = 0$-এর সমাধান কোনটি?"
+                    required
+                  />
+                </div>
+
+                {/* 4 Options Builder */}
+                <div className="space-y-2">
+                  <label className="block text-xs text-[#A3A3A3]">
+                    অপশনসমূহ (রেডিও বাটন দিয়ে সঠিক উত্তর চিহ্নিত করুন):
+                  </label>
+                  {[
+                    { label: 'ক', val: optA, set: setOptA, idx: 0 },
+                    { label: 'খ', val: optB, set: setOptB, idx: 1 },
+                    { label: 'গ', val: optC, set: setOptC, idx: 2 },
+                    { label: 'ঘ', val: optD, set: setOptD, idx: 3 },
+                  ].map((opt) => (
+                    <div key={opt.idx} className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="correct-option"
+                        checked={correctOptionIdx === opt.idx}
+                        onChange={() => setCorrectOptionIdx(opt.idx)}
+                        className="text-[#FACC15] focus:ring-[#FACC15] cursor-pointer"
+                        title="সঠিক উত্তর হিসেবে চিহ্নিত করুন"
+                      />
+                      <span className="text-xs font-mono font-bold text-[#FACC15]">{opt.label}.</span>
+                      <input
+                        type="text"
+                        value={opt.val}
+                        onChange={(e) => opt.set(e.target.value)}
+                        className="min-h-[38px] flex-1 rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
+                        placeholder={`অপশন ${opt.label}`}
+                        required
+                      />
                     </div>
                   ))}
                 </div>
 
-                {newExplanation && (
-                  <div className="pt-3 border-t border-[#1C1C1C] text-[11px] text-[#D4D4D4]">
-                    <strong className="text-[#FACC15] block mb-0.5">ব্যাখ্যার প্রিভিউ:</strong>
-                    <MathText content={newExplanation} />
+                <div>
+                  <label className="block text-xs text-[#A3A3A3] mb-1">
+                    সমাধান ও ব্যাখ্যা
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={newExplanation}
+                    onChange={(e) => setNewExplanation(e.target.value)}
+                    className="w-full rounded-lg border border-[#333] bg-[#000000] p-3 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
+                    placeholder="পরীক্ষার ফলাফলে শিক্ষার্থীরা এই ব্যাখ্যা দেখতে পাবে..."
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="min-h-[44px] w-full rounded-xl bg-[#FACC15] font-bold text-xs text-black hover:bg-[#EAB308]"
+                >
+                  প্রশ্নব্যাংকে যুক্ত করুন
+                </button>
+              </form>
+
+              {/* Live KaTeX Preview */}
+              <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6 flex flex-col">
+                <div className="flex items-center justify-between pb-3 border-b border-[#222] mb-4">
+                  <h3 className="text-xs font-bold text-[#F5F5F5] flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 text-[#FACC15]" />
+                    লাইভ রেন্ডার প্রিভিউ
+                  </h3>
+                  <span className="text-[10px] text-emerald-400 font-mono">KaTeX Active</span>
+                </div>
+
+                <div className="flex-1 rounded-lg border border-[#222] bg-[#000000] p-4 text-xs space-y-4">
+                  <div>
+                    <span className="text-[10px] text-[#A3A3A3] block mb-1">
+                      {newSubject} · {newTopic}
+                    </span>
+                    <div className="text-sm font-semibold text-[#F5F5F5]">
+                      {newStem ? <MathText content={newStem} /> : <span className="text-[#555]">প্রশ্ন লিখলে এখানে লাইভ দেখতে পাবেন...</span>}
+                    </div>
                   </div>
-                )}
+
+                  <div className="space-y-1.5">
+                    {[optA, optB, optC, optD].map((optText, i) => (
+                      <div
+                        key={i}
+                        className={`p-2 rounded border text-xs flex items-center gap-2 ${
+                          correctOptionIdx === i
+                            ? 'border-[#22C55E] bg-emerald-950/20 text-emerald-300'
+                            : 'border-[#262626] text-[#A3A3A3]'
+                        }`}
+                      >
+                        <span className="font-mono font-bold">
+                          {['ক', 'খ', 'গ', 'ঘ'][i]}.
+                        </span>
+                        <div className="flex-1">
+                          {optText ? <MathText content={optText} /> : <span className="text-[#555]">-</span>}
+                        </div>
+                        {correctOptionIdx === i && (
+                          <span className="text-[10px] text-emerald-400 font-bold">✓ সঠিক</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {newExplanation && (
+                    <div className="pt-3 border-t border-[#1C1C1C] text-[11px] text-[#D4D4D4]">
+                      <strong className="text-[#FACC15] block mb-0.5">ব্যাখ্যার প্রিভিউ:</strong>
+                      <MathText content={newExplanation} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Question Bank Table (Section 43) */}
+            <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <h3 className="text-base font-bold text-[#F5F5F5]">
+                  প্রশ্নব্যাংকের প্রশ্ন তালিকা ({filteredQuestions.length} টি)
+                </h3>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#A3A3A3]" />
+                  <input
+                    type="text"
+                    value={questionSearch}
+                    onChange={(e) => setQuestionSearch(e.target.value)}
+                    placeholder="প্রশ্ন বা বিষয় খুঁজুন..."
+                    className="min-h-[36px] rounded-lg border border-[#333] bg-[#000000] pl-8 pr-3 text-xs text-[#F5F5F5]"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#262626] text-[#A3A3A3]">
+                      <th className="pb-3 font-medium">প্রশ্ন</th>
+                      <th className="pb-3 font-medium">বিষয়</th>
+                      <th className="pb-3 font-medium">টপিক</th>
+                      <th className="pb-3 font-medium text-right">অ্যাকশন</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1C1C1C]">
+                    {filteredQuestions.map((q) => (
+                      <tr key={q.id} className="text-[#D4D4D4] hover:bg-[#121212]">
+                        <td className="py-3 font-medium text-[#F5F5F5] max-w-md">
+                          <MathText content={q.stem} inline />
+                        </td>
+                        <td className="py-3 text-[#A3A3A3]">{q.subject}</td>
+                        <td className="py-3 text-[#A3A3A3]">{q.topic}</td>
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => handleDeleteQuestion(q.id)}
+                            className="p-1.5 text-[#A3A3A3] hover:text-red-400 rounded transition-colors"
+                            title="প্রশ্ন মুছে ফেলুন"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         )}
 
-        {/* Tab 3: Quiz Management */}
+        {/* Tab 3: Quiz Management (Section 47, 48) */}
         {activeTab === 'quizzes' && (
           <div className="space-y-6">
+            <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6">
+              <h3 className="text-base font-bold text-[#F5F5F5] mb-4">
+                প্রকাশিত ও প্রস্তুতকৃত পরীক্ষা তালিকা ({quizzes.length})
+              </h3>
+
+              <div className="space-y-3">
+                {quizzes.map((quiz) => (
+                  <div
+                    key={quiz.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#222] bg-[#000000] gap-3"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 text-xs text-[#A3A3A3] mb-1">
+                        <span className="font-semibold text-[#FACC15]">
+                          {quiz.type === 'mock' ? 'মক টেস্ট' : 'কুইজ'}
+                        </span>
+                        <span>·</span>
+                        <span>{quiz.subject}</span>
+                        <span>·</span>
+                        <span>{quiz.settings.durationMinutes} মিনিট</span>
+                      </div>
+                      <h4 className="font-bold text-sm text-[#F5F5F5]">{quiz.title}</h4>
+                      <p className="text-xs text-[#A3A3A3] mt-0.5">{quiz.description}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleToggleQuizStatus(quiz.id)}
+                        className={`min-h-[38px] px-3.5 rounded-lg text-xs font-bold transition-colors ${
+                          quiz.status === 'published'
+                            ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800'
+                            : 'bg-[#262626] text-[#A3A3A3]'
+                        }`}
+                      >
+                        {quiz.status === 'published' ? '✓ প্রকাশিত (Published)' : 'ড্রাফট (Draft)'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Create Quiz Form */}
             <form onSubmit={handleCreateQuiz} className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6 space-y-4">
               <h3 className="text-base font-bold text-[#F5F5F5]">
-                নতুন মক টেস্ট বা অনুশীলন কুইজ তৈরি করুন
+                নতুন মক পরীক্ষা কনফিগার করুন
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -583,8 +758,8 @@ export default function AdminPortal({
                     type="text"
                     value={newQuizTitle}
                     onChange={(e) => setNewQuizTitle(e.target.value)}
-                    className="w-full rounded-lg border border-[#333] bg-[#000000] px-3 py-2 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
-                    placeholder="যেমন: ৪৬তম বিসিএস বিশেষ মডেল টেস্ট"
+                    className="min-h-[40px] w-full rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5]"
+                    placeholder="যেমন: ৪৬তম বিসিএস মডেল টেস্ট"
                     required
                   />
                 </div>
@@ -593,10 +768,10 @@ export default function AdminPortal({
                   <select
                     value={newQuizType}
                     onChange={(e) => setNewQuizType(e.target.value as any)}
-                    className="w-full rounded-lg border border-[#333] bg-[#000000] px-3 py-2 text-xs text-[#F5F5F5] focus:border-[#FACC15] focus:outline-none"
+                    className="min-h-[40px] w-full rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5]"
                   >
-                    <option value="mock">মক এক্সাম (নির্দিষ্ট সময় ও নেগেটিভ মার্ক)</option>
-                    <option value="quiz">অনুশীলন কুইজ (তাৎক্ষণিক ফলাফল)</option>
+                    <option value="mock">মক এক্সাম (কাউন্টডাউন ও নেগেটিভ মার্কিং)</option>
+                    <option value="quiz">অনুশীলন কুইজ</option>
                   </select>
                 </div>
               </div>
@@ -606,48 +781,45 @@ export default function AdminPortal({
                   <label className="block text-xs text-[#A3A3A3] mb-1">সময় (মিনিট)</label>
                   <input
                     type="number"
-                    min={1}
-                    max={180}
                     value={newQuizDuration}
                     onChange={(e) => setNewQuizDuration(Number(e.target.value))}
-                    className="w-full rounded-lg border border-[#333] bg-[#000000] px-3 py-2 text-xs text-[#F5F5F5]"
+                    className="min-h-[40px] w-full rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-[#A3A3A3] mb-1">নেগেটিভ মার্ক অনুপাত</label>
+                  <label className="block text-xs text-[#A3A3A3] mb-1">নেগেটিভ মার্ক</label>
                   <select
                     value={newQuizNegative}
                     onChange={(e) => setNewQuizNegative(Number(e.target.value))}
-                    className="w-full rounded-lg border border-[#333] bg-[#000000] px-3 py-2 text-xs text-[#F5F5F5]"
+                    className="min-h-[40px] w-full rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5]"
                   >
-                    <option value={0}>০ (নেগেটিভ নেই)</option>
-                    <option value={0.25}>০.২৫ (বিসিএস স্ট্যান্ডার্ড)</option>
+                    <option value={0}>০ (নেই)</option>
+                    <option value={0.25}>০.২৫ (বিসিএস)</option>
                     <option value={0.5}>০.৫০</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-[#A3A3A3] mb-1">বিষয় বিভাগ</label>
+                  <label className="block text-xs text-[#A3A3A3] mb-1">বিষয়</label>
                   <input
                     type="text"
                     value={newQuizSubject}
                     onChange={(e) => setNewQuizSubject(e.target.value)}
-                    className="w-full rounded-lg border border-[#333] bg-[#000000] px-3 py-2 text-xs text-[#F5F5F5]"
+                    className="min-h-[40px] w-full rounded-lg border border-[#333] bg-[#000000] px-3 text-xs text-[#F5F5F5]"
                   />
                 </div>
               </div>
 
-              {/* Question Selection Checkbox List */}
               <div>
                 <label className="block text-xs text-[#A3A3A3] mb-2 font-semibold">
-                  প্রশ্নব্যাংক থেকে প্রশ্ন নির্বাচন করুন ({selectedQuestionIds.length} টি নির্বাচিত):
+                  প্রশ্ন নির্বাচন করুন ({selectedQuestionIds.length} টি নির্বাচিত):
                 </label>
-                <div className="max-h-56 overflow-y-auto space-y-2 p-3 rounded-lg border border-[#222] bg-[#000000]">
+                <div className="max-h-52 overflow-y-auto space-y-2 p-3 rounded-lg border border-[#222] bg-[#000000]">
                   {questions.map((q) => {
                     const isSelected = selectedQuestionIds.includes(q.id);
                     return (
                       <label
                         key={q.id}
-                        className={`flex items-start gap-3 p-2 rounded cursor-pointer transition-colors text-xs ${
+                        className={`flex items-start gap-3 p-2 rounded cursor-pointer text-xs ${
                           isSelected ? 'bg-[#1C1C1C] text-white' : 'text-[#A3A3A3] hover:bg-[#121212]'
                         }`}
                       >
@@ -661,7 +833,7 @@ export default function AdminPortal({
                               setSelectedQuestionIds(selectedQuestionIds.filter((id) => id !== q.id));
                             }
                           }}
-                          className="mt-0.5 rounded border-[#333] text-[#FACC15] focus:ring-[#FACC15]"
+                          className="mt-0.5 text-[#FACC15]"
                         />
                         <div className="flex-1">
                           <span className="font-semibold text-[#FACC15] mr-2">[{q.subject}]</span>
@@ -675,23 +847,108 @@ export default function AdminPortal({
 
               <button
                 type="submit"
-                className="w-full rounded-lg bg-[#FACC15] py-2.5 text-xs font-bold text-black hover:bg-[#EAB308]"
+                className="min-h-[44px] w-full rounded-xl bg-[#FACC15] font-bold text-xs text-black hover:bg-[#EAB308]"
               >
-                পরীক্ষা তৈরি ও প্রকাশ করুন
+                পরীক্ষা প্রকাশ করুন
               </button>
             </form>
           </div>
         )}
 
-        {/* Tab 4: Bulk Import */}
+        {/* Tab 4: User Management (Section 50) */}
+        {activeTab === 'users' && (
+          <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-[#F5F5F5]">ইউজার ম্যানেজমেন্ট ও একাউন্ট কন্ট্রোল</h3>
+                <p className="text-xs text-[#A3A3A3]">নিবন্ধিত শিক্ষার্থী ও অ্যাডমিনদের তালিকা ও পারমিশন।</p>
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#A3A3A3]" />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="ইউজার খুঁজুন..."
+                  className="min-h-[36px] rounded-lg border border-[#333] bg-[#000000] pl-8 pr-3 text-xs text-[#F5F5F5]"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#262626] text-[#A3A3A3]">
+                    <th className="pb-3 font-medium">নাম</th>
+                    <th className="pb-3 font-medium">ইমেইল</th>
+                    <th className="pb-3 font-medium">রোল</th>
+                    <th className="pb-3 font-medium">পরীক্ষা সেশন</th>
+                    <th className="pb-3 font-medium">স্ট্যাটাস</th>
+                    <th className="pb-3 font-medium text-right">অ্যাকশন</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1C1C1C]">
+                  {userList
+                    .filter((u) => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.includes(userSearch))
+                    .map((user) => (
+                      <tr key={user.uid} className="text-[#D4D4D4] hover:bg-[#121212]">
+                        <td className="py-3 font-medium text-[#F5F5F5]">{user.name}</td>
+                        <td className="py-3 font-mono text-[#A3A3A3]">{user.email}</td>
+                        <td className="py-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              user.role === 'admin'
+                                ? 'bg-purple-950/40 text-purple-400 border border-purple-800'
+                                : 'bg-[#222] text-[#A3A3A3]'
+                            }`}
+                          >
+                            {user.role === 'admin' ? 'অ্যাডমিন' : 'শিক্ষার্থী'}
+                          </span>
+                        </td>
+                        <td className="py-3 font-mono">{user.attemptsCount} টি</td>
+                        <td className="py-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              user.status === 'active'
+                                ? 'bg-emerald-950/40 text-emerald-400'
+                                : 'bg-red-950/40 text-red-400'
+                            }`}
+                          >
+                            {user.status === 'active' ? 'সক্রিয়' : 'ব্লকড'}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right">
+                          {user.role !== 'admin' && (
+                            <button
+                              onClick={() => handleToggleUserBlock(user.uid)}
+                              className={`min-h-[32px] px-2.5 rounded text-xs font-semibold ${
+                                user.status === 'active'
+                                  ? 'border border-red-800 text-red-400 hover:bg-red-950/20'
+                                  : 'border border-emerald-800 text-emerald-400 hover:bg-emerald-950/20'
+                              }`}
+                            >
+                              {user.status === 'active' ? 'ব্লক করুন' : 'আনব্লক করুন'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 5: Bulk Import (Section 46) */}
         {activeTab === 'bulk' && (
           <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6 space-y-4">
             <h3 className="text-base font-bold text-[#F5F5F5] flex items-center gap-2">
               <Upload className="h-4 w-4 text-[#FACC15]" />
-              JSON দিয়ে বাল্ক প্রশ্ন ইমপোর্ট
+              JSON বাল্ক প্রশ্ন আপলোড
             </h3>
             <p className="text-xs text-[#A3A3A3]">
-              নিচের ফরম্যাট অনুযায়ী একাধিক প্রশ্ন একসাথে ইমপোর্ট করতে পারেন:
+              একাধিক প্রশ্ন একসাথে ইমপোর্ট করতে নিচের JSON স্ট্রাকচার অনুসরণ করুন:
             </p>
 
             <textarea
@@ -712,26 +969,26 @@ export default function AdminPortal({
               <button
                 type="button"
                 onClick={() => setBulkInput(sampleTemplate)}
-                className="rounded-lg border border-[#333] bg-[#000000] px-4 py-2 text-xs text-[#A3A3A3] hover:text-white"
+                className="min-h-[44px] rounded-lg border border-[#333] bg-[#000000] px-4 text-xs text-[#A3A3A3] hover:text-white"
               >
                 নমুনা টেমপ্লেট লোড করুন
               </button>
               <button
                 type="button"
                 onClick={handleBulkImport}
-                className="rounded-lg bg-[#FACC15] px-5 py-2 text-xs font-bold text-black hover:bg-[#EAB308]"
+                className="min-h-[44px] rounded-lg bg-[#FACC15] px-5 text-xs font-bold text-black hover:bg-[#EAB308]"
               >
-                ইমপোর্ট প্রক্রিয়া করুন
+                ইমপোর্ট সম্পন্ন করুন
               </button>
             </div>
           </div>
         )}
 
-        {/* Tab 5: Logs */}
+        {/* Tab 6: Logs (Section 52) */}
         {activeTab === 'logs' && (
           <div className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-6">
             <h3 className="text-sm font-bold text-[#F5F5F5] mb-4">
-              সিস্টেম অডিট ও নিরাপত্তা লগ ({logs.length})
+              সিস্টেম ও অডিট লগ ({logs.length})
             </h3>
             <div className="max-h-96 overflow-y-auto space-y-2 font-mono text-xs">
               {logs.map((log) => (
@@ -743,7 +1000,7 @@ export default function AdminPortal({
                     <span className="font-bold text-[#FACC15] mr-2">[{log.action}]</span>
                     <span className="text-[#D4D4D4]">{log.details}</span>
                   </div>
-                  <span className="text-[#A3A3A3] shrink-0 text-[10px]">{log.timestamp}</span>
+                  <span suppressHydrationWarning className="text-[#A3A3A3] shrink-0 text-[10px]">{log.timestamp}</span>
                 </div>
               ))}
             </div>

@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with role and academic details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "institution": { "type": "string" },
+        "targetExam": { "type": "string" },
+        "district": { "type": "string" },
+        "streak": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "email", "displayName", "role"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Quiz metadata and exam configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["quiz", "mock"] },
+        "subject": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] },
+        "durationMinutes": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "negativeRatio": { "type": "number" },
+        "passPercentage": { "type": "number" },
+        "questionIds": { "type": "array" },
+        "totalQuestions": { "type": "number" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "subject", "status"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "MCQ Question stem and options",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "stem": { "type": "string" },
+        "options": { "type": "array" },
+        "type": { "type": "string" },
+        "subject": { "type": "string" },
+        "topic": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "defaultMarks": { "type": "number" },
+        "language": { "type": "string" }
+      },
+      "required": ["id", "stem", "options", "subject"]
+    },
+    "QuestionKey": {
+      "title": "QuestionKey",
+      "description": "Question solution and correct option keys",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "correctOptionIds": { "type": "array" },
+        "explanation": { "type": "string" }
+      },
+      "required": ["questionId", "correctOptionIds"]
+    },
+    "Attempt": {
+      "title": "Attempt",
+      "description": "Student live exam attempt state and evaluation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "token": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "quizId": { "quizTitle": "string" },
+        "totalQuestions": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "startedAt": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "status": { "type": "string" },
+        "questionOrder": { "type": "array" }
+      },
+      "required": ["id", "token", "userId", "quizId", "status"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "Saved question for later review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "questionId": { "type": "string" },
+        "savedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "questionId"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System event audit trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "user": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "details": { "type": "string" },
+        "level": { "type": "string" }
+      },
+      "required": ["id", "action", "timestamp", "level"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile records"
+    },
+    "/quizzes/{quizId}": {
+      "schema": "Quiz",
+      "description": "Published and draft quizzes"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Question bank"
+    },
+    "/questionKeys/{questionId}": {
+      "schema": "QuestionKey",
+      "description": "Correct answers and explanations"
+    },
+    "/attempts/{attemptId}": {
+      "schema": "Attempt",
+      "description": "Exam sessions and results"
+    },
+    "/bookmarks/{bookmarkId}": {
+      "schema": "Bookmark",
+      "description": "Saved questions per user"
+    },
+    "/logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Security and system audit logs"
+    }
+  }
+}

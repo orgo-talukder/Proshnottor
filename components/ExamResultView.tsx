@@ -105,14 +105,14 @@ export default function ExamResultView({
             <div className="flex items-center gap-3">
               <button
                 onClick={onRetake}
-                className="flex items-center gap-1.5 rounded-lg border border-[#262626] bg-[#000000] px-4 py-2 text-xs font-semibold text-[#F5F5F5] hover:border-[#3F3F3F] transition-colors"
+                className="min-h-[44px] flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#000000] px-4 py-2 text-xs font-semibold text-[#F5F5F5] hover:border-[#3F3F3F] transition-colors"
               >
                 <RotateCcw className="h-3.5 w-3.5 text-[#FACC15]" />
                 <span>পুনরায় পরীক্ষা</span>
               </button>
               <button
                 onClick={onGoHome}
-                className="flex items-center gap-1.5 rounded-lg bg-[#FACC15] px-4 py-2 text-xs font-semibold text-black hover:bg-[#EAB308] transition-colors"
+                className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-[#FACC15] px-4 py-2 text-xs font-bold text-black hover:bg-[#EAB308] transition-colors"
               >
                 <Home className="h-3.5 w-3.5" />
                 <span>ড্যাশবোর্ড</span>
@@ -224,35 +224,35 @@ export default function ExamResultView({
             </h2>
 
             {/* Filter buttons */}
-            <div className="flex items-center gap-1 p-1 rounded-lg border border-[#262626] bg-[#0A0A0A] text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs">
               <button
                 onClick={() => setFilter('all')}
-                className={`px-3 py-1 rounded transition-colors font-medium ${
-                  filter === 'all' ? 'bg-[#262626] text-white font-bold' : 'text-[#A3A3A3] hover:text-white'
+                className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition-colors font-semibold ${
+                  filter === 'all' ? 'bg-[#262626] text-white' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
                 সব প্রশ্ন ({attempt.totalQuestions})
               </button>
               <button
                 onClick={() => setFilter('wrong')}
-                className={`px-3 py-1 rounded transition-colors font-medium ${
-                  filter === 'wrong' ? 'bg-[#262626] text-red-400 font-bold' : 'text-[#A3A3A3] hover:text-white'
+                className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition-colors font-semibold ${
+                  filter === 'wrong' ? 'bg-[#262626] text-red-400' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
                 ভুল ({result.wrong})
               </button>
               <button
                 onClick={() => setFilter('correct')}
-                className={`px-3 py-1 rounded transition-colors font-medium ${
-                  filter === 'correct' ? 'bg-[#262626] text-emerald-400 font-bold' : 'text-[#A3A3A3] hover:text-white'
+                className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition-colors font-semibold ${
+                  filter === 'correct' ? 'bg-[#262626] text-emerald-400' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
                 সঠিক ({result.correct})
               </button>
               <button
                 onClick={() => setFilter('unattempted')}
-                className={`px-3 py-1 rounded transition-colors font-medium ${
-                  filter === 'unattempted' ? 'bg-[#262626] text-purple-400 font-bold' : 'text-[#A3A3A3] hover:text-white'
+                className={`min-h-[38px] px-3.5 py-1.5 rounded-lg transition-colors font-semibold ${
+                  filter === 'unattempted' ? 'bg-[#262626] text-purple-400' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
                 অনুত্তরিত ({result.unattempted})

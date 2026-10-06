@@ -22,14 +22,14 @@ import {
   ChevronRight,
   Bookmark,
   RotateCcw,
-  CheckCircle2,
-  AlertTriangle,
-  Menu,
-  X,
-  Send,
+  Check,
   Flag,
+  Send,
+  X,
+  Menu,
+  Wifi,
+  WifiOff,
   HelpCircle,
-  ShieldAlert,
 } from 'lucide-react';
 
 interface LiveExamRunnerProps {
@@ -56,9 +56,26 @@ export default function LiveExamRunner({
   const [paletteFilter, setPaletteFilter] = useState<'all' | 'unanswered' | 'marked'>('all');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  });
   const [fontScale, setFontScale] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
 
-  // Filter the questions strictly according to attempt's questionOrder
+  // Online / Offline connectivity listener
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Filter questions strictly according to attempt's questionOrder
   const orderedQuestions: Question[] = useMemo(() => {
     if (!questions.length || !attempt.questionOrder.length) return [];
     const map = new Map<string, Question>();
@@ -72,7 +89,7 @@ export default function LiveExamRunner({
 
   const currentQuestion: Question | undefined = orderedQuestions[currentIndex];
 
-  // Handle Auto-submit
+  // Handle Auto-submit on time expiration
   const handleAutoSubmit = useCallback(() => {
     const evaluated = evaluateAttempt(attempt.id, 'timeout');
     if (evaluated) {
@@ -80,7 +97,7 @@ export default function LiveExamRunner({
     }
   }, [attempt.id, onFinishExam]);
 
-  // Calculate remaining time from server expiresAt
+  // Server-authoritative countdown timer
   useEffect(() => {
     const calculateRemaining = () => {
       const remainingMs = attempt.expiresAt - Date.now();
@@ -91,7 +108,6 @@ export default function LiveExamRunner({
       const remaining = calculateRemaining();
       setTimeLeft(remaining);
 
-      // Auto-submit on time expiration
       if (remaining <= 0) {
         clearInterval(interval);
         handleAutoSubmit();
@@ -101,7 +117,7 @@ export default function LiveExamRunner({
     return () => clearInterval(interval);
   }, [attempt.expiresAt, handleAutoSubmit]);
 
-  // Warn on accidental tab close
+  // Accidental close protection
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
@@ -111,7 +127,7 @@ export default function LiveExamRunner({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // Handle Manual Submit
+  // Manual Submit
   const handleManualSubmit = () => {
     const evaluated = evaluateAttempt(attempt.id, 'manual');
     if (evaluated) {
@@ -120,7 +136,7 @@ export default function LiveExamRunner({
     }
   };
 
-  // Answer selection handler (Optimistic Autosave)
+  // Answer selection handler (Optimistic Autosave with feedback)
   const handleSelectOption = useCallback((optionId: string) => {
     if (!currentQuestion) return;
 
@@ -135,7 +151,6 @@ export default function LiveExamRunner({
         ? currentAns.selected.filter((id) => id !== optionId)
         : [...(currentAns?.selected || []), optionId];
     } else {
-      // Single choice
       newSelected = [optionId];
     }
 
@@ -150,7 +165,7 @@ export default function LiveExamRunner({
     if (updated) {
       setAttempt(updated);
     }
-    setTimeout(() => setSaveStatus('saved'), 250);
+    setTimeout(() => setSaveStatus('saved'), 200);
   }, [attempt.id, attempt.answers, currentQuestion]);
 
   // Clear current response
@@ -188,11 +203,10 @@ export default function LiveExamRunner({
     }
   }, [attempt.id, attempt.answers, currentQuestion]);
 
-  // Navigate to index
+  // Navigate to specific index
   const goToQuestion = useCallback((index: number) => {
     if (index >= 0 && index < orderedQuestions.length) {
       const targetQ = orderedQuestions[index];
-      // mark as visited
       const currentAns = attempt.answers[targetQ.id];
       const updated = updateAttemptAnswer(
         attempt.id,
@@ -210,10 +224,8 @@ export default function LiveExamRunner({
   // Keyboard Shortcuts (1-4, N, P, M, C)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is in an input or modal is open
       if (showSubmitModal) return;
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
-
       if (!currentQuestion) return;
 
       if (e.key === '1' && currentQuestion.options[0]) {
@@ -247,7 +259,7 @@ export default function LiveExamRunner({
     handleToggleMarkForReview,
   ]);
 
-  // Determine state for a given question ID
+  // 5-State Palette Status Calculator
   const getQuestionPaletteState = useCallback((qId: string): PaletteState => {
     const ans = attempt.answers[qId];
     if (!ans || !ans.visited) return 'not_visited';
@@ -261,7 +273,7 @@ export default function LiveExamRunner({
     return 'not_answered';
   }, [attempt.answers]);
 
-  // Stats calculation for header and submit modal
+  // Stats calculation
   const stats = useMemo(() => {
     let answered = 0;
     let notAnswered = 0;
@@ -279,7 +291,7 @@ export default function LiveExamRunner({
     return { answered, notAnswered, notVisited, marked, total: attempt.questionOrder.length };
   }, [attempt.questionOrder, getQuestionPaletteState]);
 
-  // Formatting time mm:ss
+  // Format time mm:ss
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
@@ -289,7 +301,7 @@ export default function LiveExamRunner({
   const isTimerLow = timeLeft < 300; // < 5 mins
   const isTimerCritical = timeLeft < 60; // < 1 min
 
-  // Filtered Palette Items
+  // Filtered palette items
   const filteredPaletteQuestions = useMemo(() => {
     return orderedQuestions.map((q, idx) => ({
       question: q,
@@ -310,27 +322,34 @@ export default function LiveExamRunner({
   const isMarked = currentAnswer?.markedForReview || false;
   const selectedOptions = currentAnswer?.selected || [];
 
-  // Font sizing styles
   const fontSizes = {
-    sm: 'text-sm',
-    md: 'text-base',
-    lg: 'text-lg',
-    xl: 'text-xl',
+    sm: 'text-sm leading-relaxed',
+    md: 'text-base leading-relaxed',
+    lg: 'text-lg leading-relaxed',
+    xl: 'text-xl leading-relaxed',
   };
 
   return (
     <div className="relative min-h-screen bg-[#000000] text-[#F5F5F5] flex flex-col font-sans select-none">
-      {/* Top Sticky Header */}
+      {/* Offline Warning Banner (Section 26) */}
+      {!isOnline && (
+        <div className="bg-[#EF4444] text-black px-4 py-2 text-center text-xs font-bold flex items-center justify-center gap-2">
+          <WifiOff className="h-4 w-4" />
+          <span>⚠ ইন্টারনেট সংযোগ বিচ্ছিন্ন — আপনার সমস্ত উত্তর নিরাপদে ডিভাইসে সংরক্ষিত হচ্ছে।</span>
+        </div>
+      )}
+
+      {/* Top Sticky Exam Header (Height: 56-64px, distraction-free) */}
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#262626] bg-[#000000]/95 px-4 sm:px-6 backdrop-blur">
-        {/* Left: Title & Question counter */}
+        {/* Left: Exit button & Exam title */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              if (confirm('আপনি কি পরীক্ষা থেকে বেরিয়ে যেতে চান? আপনার উত্তর ড্রাফট হিসেবে সংরক্ষিত থাকবে।')) {
+              if (confirm('আপনি কি পরীক্ষা স্থগিত করতে চান? আপনার উত্তর সংরক্ষিত থাকবে এবং পরে চালিয়ে যেতে পারবেন।')) {
                 onExit();
               }
             }}
-            className="flex items-center gap-1 text-xs text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors"
+            className="min-h-[44px] flex items-center gap-1.5 text-xs text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors rounded-lg px-2"
           >
             <ChevronLeft className="h-4 w-4" />
             <span className="hidden sm:inline">প্রস্থান</span>
@@ -339,7 +358,7 @@ export default function LiveExamRunner({
           <span className="text-[#333] hidden sm:inline">|</span>
 
           <div>
-            <h1 className="text-xs sm:text-sm font-semibold text-[#F5F5F5] line-clamp-1 max-w-[200px] sm:max-w-md">
+            <h1 className="text-xs sm:text-sm font-bold text-[#F5F5F5] line-clamp-1 max-w-[180px] sm:max-w-md">
               {attempt.quizTitle}
             </h1>
             <div className="flex items-center gap-2 text-[11px] text-[#A3A3A3]">
@@ -347,42 +366,43 @@ export default function LiveExamRunner({
                 প্রশ্ন <strong className="text-[#FACC15]">{currentIndex + 1}</strong> / {orderedQuestions.length}
               </span>
               <span aria-hidden="true">·</span>
+              {/* Immediate Autosave Feedback (Section 26) */}
               <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {saveStatus === 'saving' ? 'সিঙ্ক হচ্ছে...' : 'স্বয়ংক্রিয় সংরক্ষিত'}
+                {saveStatus === 'saving' ? '⟳ সংরক্ষণ হচ্ছে...' : '✓ সব উত্তর সংরক্ষিত'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Center/Right: Timer and Actions */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          {/* Font Scaler (A- / A+) */}
+        {/* Center / Right: Font Size, Timer, Submit */}
+        <div className="flex items-center gap-2.5 sm:gap-4">
+          {/* Font Scaler */}
           <div className="hidden sm:flex items-center rounded-lg border border-[#262626] bg-[#0A0A0A] p-0.5 text-xs">
             <button
               onClick={() => setFontScale('sm')}
-              className={`px-2 py-0.5 rounded ${fontScale === 'sm' ? 'bg-[#262626] text-[#FACC15] font-bold' : 'text-[#A3A3A3]'}`}
+              className={`min-h-[32px] px-2 rounded font-semibold ${fontScale === 'sm' ? 'bg-[#262626] text-[#FACC15]' : 'text-[#A3A3A3]'}`}
             >
               A-
             </button>
             <button
               onClick={() => setFontScale('md')}
-              className={`px-2 py-0.5 rounded ${fontScale === 'md' ? 'bg-[#262626] text-[#FACC15] font-bold' : 'text-[#A3A3A3]'}`}
+              className={`min-h-[32px] px-2 rounded font-semibold ${fontScale === 'md' ? 'bg-[#262626] text-[#FACC15]' : 'text-[#A3A3A3]'}`}
             >
               A
             </button>
             <button
               onClick={() => setFontScale('lg')}
-              className={`px-2 py-0.5 rounded ${fontScale === 'lg' ? 'bg-[#262626] text-[#FACC15] font-bold' : 'text-[#A3A3A3]'}`}
+              className={`min-h-[32px] px-2 rounded font-semibold ${fontScale === 'lg' ? 'bg-[#262626] text-[#FACC15]' : 'text-[#A3A3A3]'}`}
             >
               A+
             </button>
           </div>
 
-          {/* Countdown Timer */}
-          <div className="flex items-center gap-1.5">
+          {/* Countdown Timer with Threshold Styling (Section 25) */}
+          <div className="flex items-center gap-1">
             <div
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-sm sm:text-base font-bold tabular-nums border ${
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-mono text-sm sm:text-base font-bold tabular-nums border ${
                 isTimerCritical
                   ? 'border-red-500 bg-red-950/40 text-red-400 animate-pulse'
                   : isTimerLow
@@ -394,76 +414,67 @@ export default function LiveExamRunner({
               <span>{hideTimer ? '••••••' : formatTime(timeLeft)}</span>
             </div>
 
-            {/* Hide Timer Toggle */}
+            {/* Hide Timer Toggle with explicit label tooltip */}
             <button
               onClick={() => setHideTimer(!hideTimer)}
-              title={hideTimer ? 'টাইমার দেখুন' : 'টাইমার লুকান (সময় থামবে না)'}
-              className="rounded-lg border border-[#262626] bg-[#0A0A0A] p-2 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors"
+              title="টাইমার লুকান (সময় থামবে না)"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-[#262626] bg-[#0A0A0A] text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors"
             >
               {hideTimer ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
             </button>
           </div>
 
-          {/* Mobile Palette Drawer Trigger */}
-          <button
-            onClick={() => setIsMobilePaletteOpen(true)}
-            className="flex lg:hidden items-center gap-1.5 rounded-lg border border-[#262626] bg-[#0A0A0A] px-3 py-1.5 text-xs text-[#F5F5F5]"
-          >
-            <Menu className="h-4 w-4 text-[#FACC15]" />
-            <span>প্যালেট</span>
-          </button>
-
-          {/* Submit Test Button */}
+          {/* Desktop Submit Button */}
           <button
             onClick={() => setShowSubmitModal(true)}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#22C55E] px-4 py-2 text-xs sm:text-sm font-bold text-black transition-all hover:bg-emerald-400 active:scale-[0.98]"
+            className="hidden sm:inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#22C55E] px-4 py-2 text-xs sm:text-sm font-bold text-black transition-all hover:bg-emerald-400 active:scale-[0.98]"
           >
             <Send className="h-3.5 w-3.5" />
-            <span>পরীক্ষা জমা দিন</span>
+            <span>জমা দিন</span>
           </button>
         </div>
       </header>
 
-      {/* Main Container: Split Layout (Question on Left, Palette on Right) */}
+      {/* Main Container: Split 70-75% Question / 25-30% Palette (Section 18) */}
       <div className="flex-1 flex max-w-7xl mx-auto w-full overflow-hidden">
-        {/* Left: Question Area (70% on desktop) */}
+        {/* Left: Question Stage */}
         <main className="flex-1 flex flex-col justify-between p-4 sm:p-6 lg:p-8 overflow-y-auto">
           {currentQuestion ? (
             <div className="max-w-3xl w-full mx-auto">
-              {/* Question Metadata Header */}
-              <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1C1C1C]">
+              {/* Question Header */}
+              <div className="flex items-center justify-between pb-3 mb-5 border-b border-[#1C1C1C]">
                 <div className="flex items-center gap-2 text-xs text-[#A3A3A3]">
-                  <span className="font-semibold text-[#FACC15]">
+                  <span className="font-bold text-[#FACC15]">
                     প্রশ্ন #{currentIndex + 1}
                   </span>
-                  <span aria-hidden="true">·</span>
+                  <span>·</span>
                   <span>{currentQuestion.subject}</span>
-                  <span aria-hidden="true">·</span>
+                  <span>·</span>
                   <span>{currentQuestion.topic}</span>
-                  <span aria-hidden="true">·</span>
+                  <span>·</span>
                   <span>নম্বর: {currentQuestion.defaultMarks}</span>
                 </div>
 
-                {/* Mark for review indicator button */}
+                {/* Mark for review toggle */}
                 <button
                   onClick={handleToggleMarkForReview}
-                  className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                  className={`min-h-[44px] flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors ${
                     isMarked
                       ? 'bg-[#A855F7]/20 border border-[#A855F7] text-[#A855F7]'
                       : 'border border-[#262626] text-[#A3A3A3] hover:text-white hover:border-[#3F3F3F]'
                   }`}
                 >
                   <Bookmark className={`h-3.5 w-3.5 ${isMarked ? 'fill-[#A855F7]' : ''}`} />
-                  <span>{isMarked ? 'রিভিউ চিহ্নিত' : 'রিভিউ রাখুন'}</span>
+                  <span>{isMarked ? '⚑ রিভিউ চিহ্নিত' : 'রিভিউ রাখুন'}</span>
                 </button>
               </div>
 
-              {/* Question Stem (with KaTeX) */}
-              <div className={`font-medium text-[#F5F5F5] mb-6 leading-relaxed ${fontSizes[fontScale]}`}>
+              {/* Question Stem (with KaTeX Math Support) */}
+              <div className={`font-semibold text-[#F5F5F5] mb-6 ${fontSizes[fontScale]}`}>
                 <MathText content={currentQuestion.stem} />
               </div>
 
-              {/* Options List */}
+              {/* Options List with 48px minimum touch targets */}
               <div className="space-y-3">
                 {currentQuestion.options.map((option, optIdx) => {
                   const isSelected = selectedOptions.includes(option.id);
@@ -474,15 +485,14 @@ export default function LiveExamRunner({
                     <button
                       key={option.id}
                       onClick={() => handleSelectOption(option.id)}
-                      className={`w-full text-left flex items-start gap-3.5 p-3.5 sm:p-4 rounded-xl border transition-all text-sm sm:text-base leading-relaxed ${
+                      className={`min-h-[52px] w-full text-left flex items-start gap-3.5 p-3.5 sm:p-4 rounded-xl border transition-all text-sm sm:text-base ${
                         isSelected
                           ? 'border-[#FACC15] bg-[#FACC15]/10 text-white font-medium shadow-sm'
                           : 'border-[#262626] bg-[#0A0A0A] text-[#D4D4D4] hover:border-[#3F3F3F] hover:bg-[#121212]'
                       }`}
                     >
-                      {/* Option Letter Indicator */}
                       <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-bold text-xs transition-colors ${
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-bold text-xs transition-colors ${
                           isSelected
                             ? 'bg-[#FACC15] text-black font-extrabold'
                             : 'border border-[#333] text-[#A3A3A3] bg-black'
@@ -491,8 +501,7 @@ export default function LiveExamRunner({
                         {letter}
                       </span>
 
-                      {/* Option Content with MathText */}
-                      <div className="flex-1">
+                      <div className="flex-1 pt-0.5">
                         <MathText content={option.text} />
                       </div>
                     </button>
@@ -500,15 +509,15 @@ export default function LiveExamRunner({
                 })}
               </div>
 
-              {/* Clear Response Button */}
+              {/* Clear Response */}
               {selectedOptions.length > 0 && (
                 <div className="mt-4 flex justify-end">
                   <button
                     onClick={handleClearResponse}
-                    className="flex items-center gap-1.5 text-xs text-[#A3A3A3] hover:text-red-400 transition-colors px-2 py-1"
+                    className="min-h-[44px] flex items-center gap-1.5 text-xs text-[#A3A3A3] hover:text-red-400 transition-colors px-3 py-1.5"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
-                    <span>উত্তর মুছে ফেলুন (Clear)</span>
+                    <span>উত্তর মুছে ফেলুন (Clear Response)</span>
                   </button>
                 </div>
               )}
@@ -519,61 +528,109 @@ export default function LiveExamRunner({
             </div>
           )}
 
-          {/* Bottom Sticky Action Footer */}
-          <div className="mt-8 pt-4 border-t border-[#1C1C1C] flex items-center justify-between gap-3">
-            <button
-              onClick={() => goToQuestion(currentIndex - 1)}
-              disabled={currentIndex === 0}
-              className={`flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs sm:text-sm font-medium transition-colors ${
-                currentIndex === 0
-                  ? 'border-[#262626] text-[#525252] cursor-not-allowed'
-                  : 'border-[#262626] bg-[#0A0A0A] text-[#F5F5F5] hover:bg-[#141414]'
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span>পূর্ববর্তী</span>
-            </button>
-
-            <div className="flex items-center gap-2">
+          {/* Bottom Action Footer (Responsive: Desktop vs Mobile Section 18, 20) */}
+          <div className="mt-8 pt-4 border-t border-[#1C1C1C]">
+            {/* Desktop Action Row */}
+            <div className="hidden sm:flex items-center justify-between gap-3">
               <button
-                onClick={handleToggleMarkForReview}
-                className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[#262626] bg-[#0A0A0A] px-3 py-2 text-xs text-[#A3A3A3] hover:text-[#F5F5F5]"
+                onClick={() => goToQuestion(currentIndex - 1)}
+                disabled={currentIndex === 0}
+                className={`min-h-[48px] flex items-center gap-1.5 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-colors ${
+                  currentIndex === 0
+                    ? 'border-[#262626] text-[#525252] cursor-not-allowed'
+                    : 'border-[#262626] bg-[#0A0A0A] text-[#F5F5F5] hover:bg-[#141414]'
+                }`}
               >
-                <Bookmark className="h-3.5 w-3.5" />
-                <span>রিভিউ (M)</span>
+                <ChevronLeft className="h-4 w-4" />
+                <span>পূর্ববর্তী</span>
               </button>
 
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleToggleMarkForReview}
+                  className="min-h-[48px] flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#0A0A0A] px-4 py-2.5 text-xs text-[#A3A3A3] hover:text-[#F5F5F5]"
+                >
+                  <Bookmark className="h-4 w-4" />
+                  <span>রিভিউ (M)</span>
+                </button>
+              </div>
+
               <button
-                onClick={() => setShowSubmitModal(true)}
-                className="sm:hidden flex items-center gap-1.5 rounded-lg bg-[#22C55E] px-3 py-2 text-xs font-bold text-black"
+                onClick={() => goToQuestion(currentIndex + 1)}
+                disabled={currentIndex === orderedQuestions.length - 1}
+                className={`min-h-[48px] flex items-center gap-1.5 rounded-xl px-6 py-2.5 text-sm font-bold transition-all ${
+                  currentIndex === orderedQuestions.length - 1
+                    ? 'border border-[#262626] text-[#525252] cursor-not-allowed'
+                    : 'bg-[#FACC15] text-black hover:bg-[#EAB308]'
+                }`}
               >
-                <Send className="h-3.5 w-3.5" />
-                <span>জমা দিন</span>
+                <span>পরবর্তী</span>
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
-            <button
-              onClick={() => goToQuestion(currentIndex + 1)}
-              disabled={currentIndex === orderedQuestions.length - 1}
-              className={`flex items-center gap-1.5 rounded-lg px-5 py-2 text-xs sm:text-sm font-semibold transition-all ${
-                currentIndex === orderedQuestions.length - 1
-                  ? 'border border-[#262626] text-[#525252] cursor-not-allowed'
-                  : 'bg-[#FACC15] text-black hover:bg-[#EAB308]'
-              }`}
-            >
-              <span>পরবর্তী</span>
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            {/* Mobile Action Controls (Section 20: Previous, Mark, Next, and Question List Bottom Sheet) */}
+            <div className="sm:hidden flex flex-col gap-2.5">
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => goToQuestion(currentIndex - 1)}
+                  disabled={currentIndex === 0}
+                  className={`min-h-[48px] flex items-center justify-center rounded-xl border text-xs font-bold ${
+                    currentIndex === 0
+                      ? 'border-[#262626] text-[#444] cursor-not-allowed'
+                      : 'border-[#262626] bg-[#0A0A0A] text-[#F5F5F5]'
+                  }`}
+                >
+                  পূর্ববর্তী
+                </button>
+                <button
+                  onClick={handleToggleMarkForReview}
+                  className="min-h-[48px] flex items-center justify-center rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs font-bold text-[#A855F7]"
+                >
+                  {isMarked ? '⚑ রিভিউড' : 'রিভিউ'}
+                </button>
+                <button
+                  onClick={() => goToQuestion(currentIndex + 1)}
+                  disabled={currentIndex === orderedQuestions.length - 1}
+                  className={`min-h-[48px] flex items-center justify-center rounded-xl text-xs font-bold ${
+                    currentIndex === orderedQuestions.length - 1
+                      ? 'border border-[#262626] text-[#444]'
+                      : 'bg-[#FACC15] text-black'
+                  }`}
+                >
+                  পরবর্তী
+                </button>
+              </div>
+
+              {/* Mobile Question List / Palette Bottom Sheet Trigger (Section 20) */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setIsMobilePaletteOpen(true)}
+                  className="min-h-[48px] flex items-center justify-center gap-1.5 rounded-xl border border-[#3F3F3F] bg-[#121212] text-xs font-bold text-[#F5F5F5]"
+                >
+                  <Menu className="h-4 w-4 text-[#FACC15]" />
+                  <span>প্রশ্ন তালিকা ({stats.answered}/{stats.total})</span>
+                </button>
+
+                <button
+                  onClick={() => setShowSubmitModal(true)}
+                  className="min-h-[48px] flex items-center justify-center gap-1.5 rounded-xl bg-[#22C55E] text-xs font-bold text-black"
+                >
+                  <Send className="h-4 w-4" />
+                  <span>জমা দিন</span>
+                </button>
+              </div>
+            </div>
           </div>
         </main>
 
-        {/* Right: Question Palette Grid (Desktop) */}
+        {/* Right: Question Palette Grid (Desktop 25-30% Section 18) */}
         <aside className="hidden lg:flex w-80 flex-col border-l border-[#262626] bg-[#0A0A0A] p-5">
           {/* Palette Header */}
           <div className="flex items-center justify-between pb-3 border-b border-[#1C1C1C]">
             <h3 className="text-sm font-bold text-[#F5F5F5]">প্রশ্ন প্যালেট</h3>
             <span className="text-xs text-[#A3A3A3] font-mono">
-              {stats.answered}/{stats.total} উত্তর দেওয়া
+              {stats.answered}/{stats.total} সম্পন্ন
             </span>
           </div>
 
@@ -605,7 +662,7 @@ export default function LiveExamRunner({
             </button>
           </div>
 
-          {/* Palette Buttons Grid */}
+          {/* Palette Grid with explicit colors AND icons (Section 21) */}
           <div className="mt-4 flex-1 overflow-y-auto pr-1">
             <div className="grid grid-cols-5 gap-2">
               {filteredPaletteQuestions.map((item) => {
@@ -613,39 +670,42 @@ export default function LiveExamRunner({
                 const state = item.state;
 
                 let stateClasses = 'border-[#333] text-[#A3A3A3] hover:border-[#666]';
+                let glyph: React.ReactNode = null;
+
                 if (state === 'answered') {
                   stateClasses = 'bg-[#22C55E] text-black border-[#22C55E] font-bold';
+                  glyph = <Check className="h-3 w-3 inline ml-0.5" />;
                 } else if (state === 'not_answered') {
                   stateClasses = 'border-[#EF4444] text-[#EF4444] hover:bg-red-950/20';
                 } else if (state === 'marked_for_review') {
                   stateClasses = 'bg-[#A855F7] text-white border-[#A855F7] font-bold';
+                  glyph = <Flag className="h-2.5 w-2.5 inline ml-0.5" />;
                 } else if (state === 'answered_and_marked') {
                   stateClasses = 'bg-[#A855F7] text-white border-[#22C55E] font-bold ring-2 ring-[#22C55E]';
+                  glyph = <Check className="h-2.5 w-2.5 inline ml-0.5 text-emerald-300" />;
                 }
 
                 return (
                   <button
                     key={item.question.id}
                     onClick={() => goToQuestion(item.index)}
-                    className={`relative flex h-10 w-full items-center justify-center rounded-lg text-xs font-mono transition-all border ${stateClasses} ${
+                    className={`relative min-h-[44px] flex items-center justify-center rounded-xl text-xs font-mono transition-all border ${stateClasses} ${
                       isCurrent ? 'ring-2 ring-[#FACC15] ring-offset-2 ring-offset-black scale-105' : ''
                     }`}
                   >
                     <span>{item.index + 1}</span>
-                    {state === 'answered_and_marked' && (
-                      <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-[#22C55E]" />
-                    )}
+                    {glyph}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Palette Legend */}
+          {/* 5-State Palette Legend (Section 21) */}
           <div className="pt-4 mt-auto border-t border-[#1C1C1C] space-y-2 text-[11px] text-[#A3A3A3]">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded bg-[#22C55E]" /> উত্তর দেওয়া
+                <span className="h-3 w-3 rounded bg-[#22C55E] flex items-center justify-center text-[8px] text-black font-bold">✓</span> উত্তর সম্পন্ন
               </span>
               <span className="font-bold text-[#F5F5F5] font-mono">{stats.answered}</span>
             </div>
@@ -657,7 +717,7 @@ export default function LiveExamRunner({
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded bg-[#A855F7]" /> রিভিউ চিহ্নিত
+                <span className="h-3 w-3 rounded bg-[#A855F7] flex items-center justify-center text-[8px] text-white">⚑</span> রিভিউ চিহ্নিত
               </span>
               <span className="font-bold text-[#F5F5F5] font-mono">{stats.marked}</span>
             </div>
@@ -671,60 +731,78 @@ export default function LiveExamRunner({
         </aside>
       </div>
 
-      {/* Mobile Palette Drawer / Modal */}
+      {/* Mobile Palette Bottom Sheet (Section 20 & 26) */}
       {isMobilePaletteOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-sm lg:hidden">
-          <div className="max-h-[80vh] w-full rounded-t-2xl border-t border-[#262626] bg-[#0A0A0A] p-5 flex flex-col">
+          <div className="max-h-[82vh] w-full rounded-t-3xl border-t border-[#262626] bg-[#0A0A0A] p-5 flex flex-col shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-[#1C1C1C]">
-              <h3 className="text-base font-bold text-[#F5F5F5]">প্রশ্ন প্যালেট ({stats.answered}/{stats.total})</h3>
+              <div>
+                <h3 className="text-base font-bold text-[#F5F5F5]">প্রশ্ন তালিকা (Question Palette)</h3>
+                <span className="text-xs text-[#A3A3A3]">
+                  {stats.answered}/{stats.total} উত্তর দেওয়া সম্পন্ন
+                </span>
+              </div>
               <button
                 onClick={() => setIsMobilePaletteOpen(false)}
-                className="rounded-lg p-1 text-[#A3A3A3] hover:text-white"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-[#1C1C1C] text-[#A3A3A3] hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="my-3 flex items-center gap-1 bg-black p-1 rounded-lg border border-[#262626] text-xs">
+            {/* Filter buttons */}
+            <div className="my-3 flex items-center gap-1 bg-black p-1 rounded-xl border border-[#262626] text-xs">
               <button
                 onClick={() => setPaletteFilter('all')}
-                className={`flex-1 py-1 rounded ${paletteFilter === 'all' ? 'bg-[#262626] text-white font-bold' : 'text-[#A3A3A3]'}`}
+                className={`min-h-[40px] flex-1 rounded-lg ${paletteFilter === 'all' ? 'bg-[#262626] text-white font-bold' : 'text-[#A3A3A3]'}`}
               >
                 সব
               </button>
               <button
                 onClick={() => setPaletteFilter('unanswered')}
-                className={`flex-1 py-1 rounded ${paletteFilter === 'unanswered' ? 'bg-[#262626] text-red-400 font-bold' : 'text-[#A3A3A3]'}`}
+                className={`min-h-[40px] flex-1 rounded-lg ${paletteFilter === 'unanswered' ? 'bg-[#262626] text-red-400 font-bold' : 'text-[#A3A3A3]'}`}
               >
                 বাকি
               </button>
               <button
                 onClick={() => setPaletteFilter('marked')}
-                className={`flex-1 py-1 rounded ${paletteFilter === 'marked' ? 'bg-[#262626] text-purple-400 font-bold' : 'text-[#A3A3A3]'}`}
+                className={`min-h-[40px] flex-1 rounded-lg ${paletteFilter === 'marked' ? 'bg-[#262626] text-purple-400 font-bold' : 'text-[#A3A3A3]'}`}
               >
                 রিভিউ
               </button>
             </div>
 
+            {/* Grid */}
             <div className="overflow-y-auto py-2 flex-1">
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-5 gap-2.5">
                 {filteredPaletteQuestions.map((item) => {
                   const state = item.state;
                   let stateClasses = 'border-[#333] text-[#A3A3A3]';
-                  if (state === 'answered') stateClasses = 'bg-[#22C55E] text-black border-[#22C55E] font-bold';
-                  if (state === 'not_answered') stateClasses = 'border-[#EF4444] text-[#EF4444]';
-                  if (state === 'marked_for_review') stateClasses = 'bg-[#A855F7] text-white border-[#A855F7] font-bold';
-                  if (state === 'answered_and_marked') stateClasses = 'bg-[#A855F7] text-white border-[#22C55E] ring-1 ring-[#22C55E]';
+                  let glyph = null;
+
+                  if (state === 'answered') {
+                    stateClasses = 'bg-[#22C55E] text-black border-[#22C55E] font-bold';
+                    glyph = <Check className="h-3 w-3 inline ml-0.5" />;
+                  } else if (state === 'not_answered') {
+                    stateClasses = 'border-[#EF4444] text-[#EF4444]';
+                  } else if (state === 'marked_for_review') {
+                    stateClasses = 'bg-[#A855F7] text-white border-[#A855F7] font-bold';
+                    glyph = <Flag className="h-2.5 w-2.5 inline ml-0.5" />;
+                  } else if (state === 'answered_and_marked') {
+                    stateClasses = 'bg-[#A855F7] text-white border-[#22C55E] ring-1 ring-[#22C55E]';
+                    glyph = <Check className="h-2.5 w-2.5 inline ml-0.5 text-emerald-300" />;
+                  }
 
                   return (
                     <button
                       key={item.question.id}
                       onClick={() => goToQuestion(item.index)}
-                      className={`h-11 w-full rounded-lg flex items-center justify-center text-xs font-mono border ${stateClasses} ${
+                      className={`min-h-[48px] rounded-xl flex items-center justify-center text-xs font-mono border ${stateClasses} ${
                         item.index === currentIndex ? 'ring-2 ring-[#FACC15]' : ''
                       }`}
                     >
-                      {item.index + 1}
+                      <span>{item.index + 1}</span>
+                      {glyph}
                     </button>
                   );
                 })}
@@ -736,7 +814,7 @@ export default function LiveExamRunner({
                 setIsMobilePaletteOpen(false);
                 setShowSubmitModal(true);
               }}
-              className="mt-4 w-full rounded-lg bg-[#22C55E] py-2.5 text-center text-sm font-bold text-black"
+              className="mt-4 min-h-[48px] w-full rounded-xl bg-[#22C55E] py-3 text-center text-sm font-bold text-black"
             >
               পরীক্ষা শেষ ও জমা দিন
             </button>
@@ -744,7 +822,7 @@ export default function LiveExamRunner({
         </div>
       )}
 
-      {/* Submit Confirmation Modal */}
+      {/* Submit Confirmation Modal (Section 24) */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-[#262626] bg-[#0A0A0A] p-6 shadow-2xl">
@@ -757,27 +835,26 @@ export default function LiveExamRunner({
                   পরীক্ষা জমা দিতে চান?
                 </h3>
                 <p className="text-xs text-[#A3A3A3]">
-                  জমা দেওয়ার পূর্বে আপনার উত্তরের সারসংক্ষেপ যাচাই করুন:
+                  জমা দেওয়ার পূর্বে আপনার উত্তরের সারসংক্ষেপ:
                 </p>
               </div>
             </div>
 
-            {/* Matrix of status */}
             <div className="space-y-2.5 my-5 p-4 rounded-xl border border-[#262626] bg-[#000000] text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-[#A3A3A3]">মোট প্রশ্ন:</span>
                 <span className="font-bold text-[#F5F5F5] font-mono">{stats.total} টি</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-emerald-400">উত্তর দেওয়া হয়েছে:</span>
+                <span className="text-emerald-400 font-semibold">উত্তর দেওয়া হয়েছে:</span>
                 <span className="font-bold text-emerald-400 font-mono">{stats.answered} টি</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-red-400">উত্তরহীন রয়েছে:</span>
+                <span className="text-red-400 font-semibold">উত্তরহীন রয়েছে:</span>
                 <span className="font-bold text-red-400 font-mono">{stats.notAnswered + stats.notVisited} টি</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-purple-400">রিভিউ চিহ্নিত:</span>
+                <span className="text-purple-400 font-semibold">রিভিউ চিহ্নিত:</span>
                 <span className="font-bold text-purple-400 font-mono">{stats.marked} টি</span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-[#1C1C1C]">
@@ -786,23 +863,16 @@ export default function LiveExamRunner({
               </div>
             </div>
 
-            {stats.notAnswered + stats.notVisited > 0 && (
-              <p className="text-[11px] text-amber-400/90 mb-5 flex items-center gap-1.5">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                আপনার এখনও {stats.notAnswered + stats.notVisited} টি প্রশ্নের উত্তর বাকি রয়েছে।
-              </p>
-            )}
-
             <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => setShowSubmitModal(false)}
-                className="rounded-lg border border-[#262626] bg-[#0A0A0A] px-4 py-2 text-xs font-medium text-[#A3A3A3] hover:text-[#F5F5F5]"
+                className="min-h-[44px] rounded-xl border border-[#262626] bg-[#0A0A0A] px-4 py-2 text-xs font-semibold text-[#A3A3A3] hover:text-[#F5F5F5]"
               >
                 ফিরে যান
               </button>
               <button
                 onClick={handleManualSubmit}
-                className="rounded-lg bg-[#22C55E] px-5 py-2 text-xs font-bold text-black hover:bg-emerald-400 active:scale-[0.98]"
+                className="min-h-[44px] rounded-xl bg-[#22C55E] px-5 py-2 text-xs font-bold text-black hover:bg-emerald-400 active:scale-[0.98]"
               >
                 হ্যাঁ, নিশ্চিতভাবে জমা দিন
               </button>

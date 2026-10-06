@@ -10,6 +10,34 @@ export type PaletteState =
   | 'marked_for_review'
   | 'answered_and_marked';
 
+export type NavigationTab =
+  | 'dashboard'
+  | 'mcq_exam'
+  | 'history_exams'
+  | 'history_wrong'
+  | 'progress'
+  | 'bookmarks'
+  | 'leaderboard'
+  | 'notifications'
+  | 'help'
+  | 'privacy'
+  | 'profile'
+  | 'settings'
+  | 'admin';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'student' | 'admin';
+  institution?: string;
+  targetExam?: string;
+  district?: string;
+  streak: number;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
 export interface QuestionOption {
   id: string;
   text: string;
@@ -109,6 +137,32 @@ export interface ExamAttempt {
   questionOrder: string[];
   answers: Record<string, ExamAnswerState>;
   result?: ExamEvaluationResult;
+}
+
+export interface Bookmark {
+  id: string;
+  userId: string;
+  questionId: string;
+  subject: string;
+  topic: string;
+  savedAt: number;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  type: 'exam' | 'result' | 'system' | 'streak';
+  linkTab?: NavigationTab;
+}
+
+export interface ExamPreferences {
+  hideTimer: boolean;
+  confirmSubmit: boolean;
+  fontScale: 'sm' | 'md' | 'lg' | 'xl';
+  soundEnabled: boolean;
 }
 
 export interface SystemAuditLog {

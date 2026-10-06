@@ -4,14 +4,16 @@ import React, { useMemo } from 'react';
 import katex from 'katex';
 
 interface MathTextProps {
-  content: string;
+  content?: string;
+  text?: string;
   className?: string;
   inline?: boolean;
 }
 
-export default function MathText({ content, className = '', inline = false }: MathTextProps) {
+export default function MathText({ content, text, className = '', inline = false }: MathTextProps) {
+  const rawText = content || text || '';
   const renderedContent = useMemo(() => {
-    if (!content) return null;
+    if (!rawText) return null;
 
     // Pattern to identify math expressions:
     // $$...$$ for display math
@@ -22,12 +24,12 @@ export default function MathText({ content, className = '', inline = false }: Ma
     let match: RegExpExecArray | null;
     let keyIdx = 0;
 
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = regex.exec(rawText)) !== null) {
       // Add plain text before match
       if (match.index > lastIndex) {
         parts.push(
           <span key={`text-${keyIdx++}`}>
-            {content.substring(lastIndex, match.index)}
+            {rawText.substring(lastIndex, match.index)}
           </span>
         );
       }
@@ -62,16 +64,16 @@ export default function MathText({ content, className = '', inline = false }: Ma
       lastIndex = regex.lastIndex;
     }
 
-    if (lastIndex < content.length) {
+    if (lastIndex < rawText.length) {
       parts.push(
         <span key={`text-end-${keyIdx++}`}>
-          {content.substring(lastIndex)}
+          {rawText.substring(lastIndex)}
         </span>
       );
     }
 
     return parts;
-  }, [content]);
+  }, [rawText]);
 
   const Tag = inline ? 'span' : 'div';
 
