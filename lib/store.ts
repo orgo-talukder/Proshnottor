@@ -52,7 +52,7 @@ const initialNotifications: AppNotification[] = [
     timestamp: '১০ মিনিট আগে',
     read: false,
     type: 'exam',
-    linkTab: 'mcq_exam',
+    linkTab: 'mcq',
   },
   {
     id: 'notif-2',

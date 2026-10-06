@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   LayoutDashboard,
   FileQuestion,
   History,
-  AlertTriangle,
   TrendingUp,
   Bookmark,
   Trophy,
@@ -18,7 +17,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   X,
 } from 'lucide-react';
 import { NavigationTab, UserProfile } from '../lib/types';
@@ -26,20 +24,20 @@ import { NavigationTab, UserProfile } from '../lib/types';
 interface AppSidebarProps {
   currentTab: NavigationTab;
   onSelectTab: (tab: NavigationTab) => void;
-  userRole: 'student' | 'admin';
+  isAdmin: boolean;
   unreadNotifsCount: number;
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  profile: UserProfile;
+  profile: UserProfile | null;
   onLogout: () => void;
 }
 
 export default function AppSidebar({
   currentTab,
   onSelectTab,
-  userRole,
+  isAdmin,
   unreadNotifsCount,
   collapsed,
   onToggleCollapse,
@@ -48,16 +46,10 @@ export default function AppSidebar({
   profile,
   onLogout,
 }: AppSidebarProps) {
-  const [historyOpen, setHistoryOpen] = useState(
-    currentTab === 'history_exams' || currentTab === 'history_wrong'
-  );
-
   const handleNav = (tab: NavigationTab) => {
     onSelectTab(tab);
     onCloseMobile();
   };
-
-  const isHistoryActive = currentTab === 'history_exams' || currentTab === 'history_wrong';
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-[#000000] border-r border-[#262626] text-[#F5F5F5] select-none">
@@ -131,20 +123,20 @@ export default function AppSidebar({
             </button>
 
             <button
-              onClick={() => handleNav('mcq_exam')}
+              onClick={() => handleNav('mcq')}
               title={collapsed ? 'MCQ Exam' : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-colors relative ${
-                currentTab === 'mcq_exam'
+                currentTab === 'mcq'
                   ? 'bg-[#121212] text-[#F5F5F5] font-semibold'
                   : 'text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#0A0A0A]'
               }`}
             >
-              {currentTab === 'mcq_exam' && (
+              {currentTab === 'mcq' && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#FACC15] rounded-r-full" />
               )}
               <FileQuestion
                 className={`h-4 w-4 shrink-0 ${
-                  currentTab === 'mcq_exam' ? 'text-[#FACC15]' : 'text-[#A3A3A3]'
+                  currentTab === 'mcq' ? 'text-[#FACC15]' : 'text-[#A3A3A3]'
                 }`}
               />
               {!collapsed && <span>MCQ Exam</span>}
@@ -160,70 +152,26 @@ export default function AppSidebar({
             </div>
           )}
           <nav className="space-y-1">
-            {/* History Accordion / Group */}
-            <div>
-              <button
-                onClick={() => {
-                  if (collapsed) {
-                    handleNav('history_exams');
-                  } else {
-                    setHistoryOpen(!historyOpen);
-                  }
-                }}
-                title={collapsed ? 'History' : undefined}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-colors relative ${
-                  isHistoryActive
-                    ? 'bg-[#121212] text-[#F5F5F5] font-semibold'
-                    : 'text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#0A0A0A]'
-                }`}
-              >
-                {isHistoryActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#FACC15] rounded-r-full" />
-                )}
-                <div className="flex items-center gap-3 truncate">
-                  <History
-                    className={`h-4 w-4 shrink-0 ${
-                      isHistoryActive ? 'text-[#FACC15]' : 'text-[#A3A3A3]'
-                    }`}
-                  />
-                  {!collapsed && <span>History</span>}
-                </div>
-                {!collapsed && (
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 text-[#6B6B6B] transition-transform ${
-                      historyOpen ? 'rotate-180' : ''
-                    }`}
-                  />
-                )}
-              </button>
-
-              {/* Sub-items if expanded */}
-              {(!collapsed && historyOpen) && (
-                <div className="ml-5 mt-1 pl-3 border-l border-[#262626] space-y-1">
-                  <button
-                    onClick={() => handleNav('history_exams')}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] transition-colors ${
-                      currentTab === 'history_exams'
-                        ? 'text-[#FACC15] font-semibold bg-[#121212]'
-                        : 'text-[#A3A3A3] hover:text-white'
-                    }`}
-                  >
-                    Exam History
-                  </button>
-                  <button
-                    onClick={() => handleNav('history_wrong')}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-colors ${
-                      currentTab === 'history_wrong'
-                        ? 'text-[#EF4444] font-semibold bg-[#121212]'
-                        : 'text-[#A3A3A3] hover:text-white'
-                    }`}
-                  >
-                    <span>Wrong Questions</span>
-                    <AlertTriangle className="h-3 w-3 text-[#EF4444]" />
-                  </button>
-                </div>
+            {/* History Single Direct Button (NO Dropdown, NO Chevron) */}
+            <button
+              onClick={() => handleNav('history')}
+              title={collapsed ? 'History' : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-colors relative ${
+                currentTab === 'history'
+                  ? 'bg-[#121212] text-[#F5F5F5] font-semibold'
+                  : 'text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#0A0A0A]'
+              }`}
+            >
+              {currentTab === 'history' && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#FACC15] rounded-r-full" />
               )}
-            </div>
+              <History
+                className={`h-4 w-4 shrink-0 ${
+                  currentTab === 'history' ? 'text-[#FACC15]' : 'text-[#A3A3A3]'
+                }`}
+              />
+              {!collapsed && <span>History</span>}
+            </button>
 
             <button
               onClick={() => handleNav('progress')}
@@ -414,8 +362,8 @@ export default function AppSidebar({
           </nav>
         </div>
 
-        {/* ADMINISTRATION (Strictly only visible if userRole === 'admin') */}
-        {userRole === 'admin' && (
+        {/* ADMINISTRATION (Strictly only visible if user is the verified admin) */}
+        {isAdmin && (
           <div>
             {!collapsed && (
               <div className="px-2 mb-1.5 text-[10px] font-bold tracking-wider text-amber-500 uppercase flex items-center justify-between">
@@ -448,21 +396,21 @@ export default function AppSidebar({
 
       {/* Footer / User Profile & Logout */}
       <div className="p-3 border-t border-[#262626] bg-[#0A0A0A]">
-        {!collapsed ? (
+        {!collapsed && profile ? (
           <div className="flex items-center justify-between">
             <div
               onClick={() => handleNav('profile')}
               className="flex items-center gap-2.5 truncate cursor-pointer hover:opacity-80 transition-opacity"
             >
               <div className="h-8 w-8 rounded-full bg-[#1A1A1A] border border-[#333] flex items-center justify-center text-xs font-bold text-[#FACC15] shrink-0">
-                {profile.displayName.charAt(0)}
+                {profile.displayName?.charAt(0) || 'U'}
               </div>
               <div className="flex flex-col truncate">
                 <span className="text-xs font-semibold text-[#F5F5F5] truncate leading-tight">
-                  {profile.displayName}
+                  {profile.displayName || 'User'}
                 </span>
                 <span className="text-[10px] text-[#A3A3A3] truncate">
-                  {userRole === 'admin' ? 'Administrator' : 'Student'}
+                  {isAdmin ? 'Administrator' : 'Student'}
                 </span>
               </div>
             </div>

@@ -15,30 +15,31 @@ import {
   Play,
   BookOpen,
 } from 'lucide-react';
-import { ExamAttempt, Question, QuestionKey, Quiz } from '../lib/types';
+import { ExamAttempt, Question, QuestionKey } from '../lib/types';
 import MathText from './MathText';
 
 interface HistoryAndWrongQuestionsProps {
   attempts: ExamAttempt[];
   questions: Question[];
   questionKeys: Record<string, QuestionKey>;
-  activeTab: 'history_exams' | 'history_wrong';
-  onSelectTab: (tab: 'history_exams' | 'history_wrong') => void;
+  initialTab?: 'exams' | 'wrong';
   onViewAttemptResult: (attempt: ExamAttempt) => void;
   onRetakeQuiz: (quizId: string) => void;
   onStartCustomWrongPractice: (wrongQuestions: Question[]) => void;
+  onNavigateToMCQ: () => void;
 }
 
 export default function HistoryAndWrongQuestions({
   attempts,
   questions,
   questionKeys,
-  activeTab,
-  onSelectTab,
+  initialTab = 'exams',
   onViewAttemptResult,
   onRetakeQuiz,
   onStartCustomWrongPractice,
+  onNavigateToMCQ,
 }: HistoryAndWrongQuestionsProps) {
+  const [activeTab, setActiveTab] = useState<'exams' | 'wrong'>(initialTab);
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [searchFilter, setSearchFilter] = useState<string>('');
 
@@ -49,7 +50,7 @@ export default function HistoryAndWrongQuestions({
       .sort((a, b) => (b.submittedAt || b.startedAt) - (a.submittedAt || a.startedAt));
   }, [attempts]);
 
-  // Aggregate all wrong questions across attempts
+  // Aggregate all wrong questions across real user attempts
   const wrongQuestionsData = useMemo(() => {
     const wrongMap = new Map<string, { question: Question; userAnswers: string[]; lastAttemptDate: string }>();
 
@@ -94,24 +95,24 @@ export default function HistoryAndWrongQuestions({
   }, [wrongQuestionsData, subjectFilter, searchFilter]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header with Sub-tabs (Spec Section 44-49) */}
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 select-none">
+      {/* Header with Page-Level Tabs (Spec Section 7 & 44) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#262626] pb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#F5F5F5] tracking-tight">
             History & Mistake Review
           </h1>
           <p className="text-xs sm:text-sm text-[#A3A3A3] mt-1">
-            আগের পরীক্ষার ইতিহাস ও ভুল হওয়া প্রশ্নের নিবিড় পর্যালোচনা।
+            আপনার সম্পন্ন হওয়া পরীক্ষার ফলাফল ও ভুল হওয়া প্রশ্নের নিবিড় পর্যালোচনা।
           </p>
         </div>
 
-        {/* 2 Tabs: Exam History & Wrong Questions */}
+        {/* 2 Page-Level Tabs: [Exam History] [Wrong Questions] */}
         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#0A0A0A] border border-[#262626] self-start sm:self-auto">
           <button
-            onClick={() => onSelectTab('history_exams')}
+            onClick={() => setActiveTab('exams')}
             className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
-              activeTab === 'history_exams'
+              activeTab === 'exams'
                 ? 'bg-[#1C1C1C] text-[#FACC15] shadow'
                 : 'text-[#A3A3A3] hover:text-white'
             }`}
@@ -121,9 +122,9 @@ export default function HistoryAndWrongQuestions({
           </button>
 
           <button
-            onClick={() => onSelectTab('history_wrong')}
+            onClick={() => setActiveTab('wrong')}
             className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
-              activeTab === 'history_wrong'
+              activeTab === 'wrong'
                 ? 'bg-[#1C1C1C] text-[#EF4444] shadow'
                 : 'text-[#A3A3A3] hover:text-white'
             }`}
@@ -135,20 +136,26 @@ export default function HistoryAndWrongQuestions({
       </div>
 
       {/* TAB 1: EXAM HISTORY */}
-      {activeTab === 'history_exams' && (
+      {activeTab === 'exams' && (
         <div className="space-y-4">
           {completedAttempts.length === 0 ? (
-            <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-12 text-center max-w-md mx-auto">
-              <History className="h-10 w-10 text-[#6B6B6B] mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-[#F5F5F5]">এখনও কোনো Exam History নেই</h3>
-              <p className="text-xs text-[#A3A3A3] mt-1">
-                প্রথম একটি MCQ Exam শুরু করুন এবং পরীক্ষা শেষে এখানে আপনার ফলাফল সংরক্ষিত হবে।
+            <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-12 text-center max-w-md mx-auto space-y-3">
+              <History className="h-10 w-10 text-[#6B6B6B] mx-auto mb-1" />
+              <h3 className="text-sm font-bold text-[#F5F5F5]">এখনও কোনো Exam History নেই।</h3>
+              <p className="text-xs text-[#A3A3A3] leading-relaxed">
+                প্রথম একটি MCQ Exam শুরু করুন এবং পরীক্ষা শেষে এখানে আপনার ফলাফল ও অ্যানালিটিক্স সংরক্ষিত হবে।
               </p>
+              <button
+                onClick={onNavigateToMCQ}
+                className="mt-2 h-9 px-4 rounded-xl bg-[#262626] text-xs font-semibold text-white hover:bg-[#333] transition-colors"
+              >
+                MCQ পরীক্ষা শুরু করুন
+              </button>
             </div>
           ) : (
             <div className="space-y-3">
               {completedAttempts.map((att) => {
-                const isPassed = att.result ? att.result.percentage >= 60 : false;
+                const isPassed = att.result ? att.result.percentage >= 50 : false;
                 const dateStr = new Date(att.submittedAt || att.startedAt).toLocaleDateString('bn-BD', {
                   day: 'numeric',
                   month: 'short',
@@ -164,7 +171,9 @@ export default function HistoryAndWrongQuestions({
                   >
                     <div className="space-y-1.5 flex-1">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="font-semibold text-[#FACC15]">{att.quizType === 'mock' ? 'মক টেস্ট' : 'কুইজ'}</span>
+                        <span className="font-semibold text-[#FACC15]">
+                          {att.quizType === 'mock' ? 'মক টেস্ট' : 'কুইজ'}
+                        </span>
                         <span className="text-[#444]">·</span>
                         <span className="text-[#A3A3A3] flex items-center gap-1 font-mono text-[11px]">
                           <Calendar className="h-3 w-3 text-[#6B6B6B]" />
@@ -225,10 +234,10 @@ export default function HistoryAndWrongQuestions({
         </div>
       )}
 
-      {/* TAB 2: WRONG QUESTIONS REVIEW (Spec Section 47-49) */}
-      {activeTab === 'history_wrong' && (
+      {/* TAB 2: WRONG QUESTIONS REVIEW (Spec Section 8 & 47-49) */}
+      {activeTab === 'wrong' && (
         <div className="space-y-6">
-          {/* Top CTA Bar for practicing wrong questions */}
+          {/* Top Info Bar */}
           <div className="rounded-2xl border border-[#EF4444]/30 bg-[#140A0A] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -237,14 +246,14 @@ export default function HistoryAndWrongQuestions({
                 </span>
                 <span className="text-[#555]">·</span>
                 <span className="text-xs text-[#A3A3A3] font-mono">
-                  {wrongQuestionsData.length} টি প্রশ্নের বিশেষ পুনর্বিবেচনা প্রয়োজন
+                  {wrongQuestionsData.length} টি প্রশ্নের পুনর্বিবেচনা প্রয়োজন
                 </span>
               </div>
               <h3 className="text-base font-bold text-[#F5F5F5] mt-1">
                 ভুল থেকেই আসল প্রস্তুতি
               </h3>
               <p className="text-xs text-[#A3A3A3] mt-0.5">
-                আগের পরীক্ষাগুলোতে যে প্রশ্নগুলোর ভুল উত্তর দিয়েছিলেন, সেগুলোর নির্ভুল সমাধান ও ব্যাখ্যা দেখুন।
+                যে প্রশ্নগুলোর উত্তর ভুল হয়েছিল, সেগুলোর সঠিক সমাধান ও ব্যাখ্যা দেখে পুনরায় অনুশীলন করুন।
               </p>
             </div>
 
@@ -260,36 +269,38 @@ export default function HistoryAndWrongQuestions({
           </div>
 
           {/* Subject Filter Bar */}
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={subjectFilter}
-              onChange={(e) => setSubjectFilter(e.target.value)}
-              className="h-9 px-3 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs text-[#F5F5F5] outline-none focus:border-[#FACC15]"
-            >
-              <option value="all">সকল বিষয় (All Subjects)</option>
-              {availableSubjects.map((sub) => (
-                <option key={sub} value={sub}>
-                  {sub}
-                </option>
-              ))}
-            </select>
+          {wrongQuestionsData.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs text-[#F5F5F5] outline-none focus:border-[#FACC15]"
+              >
+                <option value="all">সকল বিষয় (All Subjects)</option>
+                {availableSubjects.map((sub) => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </select>
 
-            <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="প্রশ্ন বা টপিক খুঁজুন..."
-              className="h-9 px-3 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs text-[#F5F5F5] outline-none focus:border-[#FACC15] w-64"
-            />
-          </div>
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="প্রশ্ন বা টপিক খুঁজুন..."
+                className="h-9 px-3 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs text-[#F5F5F5] outline-none focus:border-[#FACC15] w-64"
+              />
+            </div>
+          )}
 
           {/* List of Wrong Question Cards */}
           {filteredWrongQuestions.length === 0 ? (
-            <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-12 text-center max-w-md mx-auto">
-              <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-[#F5F5F5]">কোনো ভুল প্রশ্ন নেই!</h3>
-              <p className="text-xs text-[#A3A3A3] mt-1">
-                আপনার বাছাইকৃত ফিল্টারে কোনো ভুল প্রশ্ন পাওয়া যায়নি। দারুণ প্রস্তুতি!
+            <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-12 text-center max-w-md mx-auto space-y-2">
+              <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-1" />
+              <h3 className="text-sm font-bold text-[#F5F5F5]">এখনও কোনো ভুল প্রশ্ন নেই।</h3>
+              <p className="text-xs text-[#A3A3A3] leading-relaxed">
+                আপনার পরীক্ষাগুলোতে কোনো ভুল উত্তর রেকর্ড করা হয়নি অথবা এখনও পরীক্ষা সম্পন্ন করেননি।
               </p>
             </div>
           ) : (

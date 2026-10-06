@@ -22,7 +22,7 @@ import {
 import { Quiz, ExamAttempt, UserProfile, NavigationTab } from '../lib/types';
 
 interface DashboardViewProps {
-  profile: UserProfile;
+  profile: UserProfile | null;
   quizzes: Quiz[];
   attempts: ExamAttempt[];
   inProgressAttempt?: ExamAttempt;
@@ -55,7 +55,7 @@ export default function DashboardView({
       })()
     : 'Welcome';
 
-  // Compute live statistics
+  // Compute live statistics strictly from real attempts
   const stats = useMemo(() => {
     const completed = attempts.filter((a) => a.status === 'evaluated' && a.result);
     const totalExams = completed.length;
@@ -79,12 +79,12 @@ export default function DashboardView({
       totalExams,
       avgScore,
       avgAccuracy,
-      streak: profile.streak || 7,
+      streak: profile?.streak || (totalExams > 0 ? 1 : 0),
       wrongQuestionsCount,
     };
   }, [attempts, profile]);
 
-  // Recommended exams (up to 3)
+  // Recommended exams (up to 3 real Firestore quizzes)
   const recommendedExams = useMemo(() => {
     return quizzes.slice(0, 3);
   }, [quizzes]);
@@ -97,23 +97,23 @@ export default function DashboardView({
   }, [attempts]);
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 select-none">
       {/* 1. Top Greeting Section (Spec Section 13-14) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#262626] pb-6">
         <div>
           <div className="flex items-center gap-2">
             <h1 suppressHydrationWarning className="text-2xl sm:text-3xl font-extrabold text-[#F5F5F5] tracking-tight">
-              {greeting}, {profile.displayName.split(' ')[0]} 👋
+              {greeting}, {profile?.displayName?.split(' ')[0] || 'শিক্ষার্থী'} 👋
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-[#A3A3A3] mt-1">
-            আজকের প্রস্তুতি শুরু করা যাক · {profile.targetExam || 'বিসিএস ও চাকরির প্রস্তুতি'}
+            আজকের প্রস্তুতি শুরু করা যাক · {profile?.targetExam || 'বিসিএস ও চাকরির প্রস্তুতি'}
           </p>
         </div>
 
         {/* Primary Quick Start CTA */}
         <button
-          onClick={() => onNavigateTab('mcq_exam')}
+          onClick={() => onNavigateTab('mcq')}
           className="self-start sm:self-auto inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-[#FACC15] text-black font-bold text-xs hover:bg-[#EAB308] active:scale-95 transition-all shadow-md"
         >
           <Play className="h-4 w-4 fill-black" />
@@ -163,7 +163,7 @@ export default function DashboardView({
                 }}
                 className="h-10 px-5 rounded-xl bg-[#FACC15] text-black font-bold text-xs hover:bg-[#EAB308] flex items-center gap-2 transition-all shadow"
               >
-                <span>পরীক্ষা চালিয়ে যান</span>
+                <span>পরীক্ষা চালিয়ে যান</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -171,7 +171,7 @@ export default function DashboardView({
         </div>
       )}
 
-      {/* 3. Summary Stats Grid (Spec Section 15: 4 Main Stats) */}
+      {/* 3. Summary Stats Grid (Spec Section 15: Real User Data) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1: Total Exams */}
         <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-4 sm:p-5 flex flex-col justify-between hover:border-[#333] transition-colors">
@@ -247,7 +247,7 @@ export default function DashboardView({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
           {/* Card 1: MCQ Exam */}
           <button
-            onClick={() => onNavigateTab('mcq_exam')}
+            onClick={() => onNavigateTab('mcq')}
             className="group rounded-2xl border border-[#262626] bg-[#0A0A0A] hover:bg-[#121212] hover:border-[#3F3F3F] p-4 text-left transition-all"
           >
             <div className="h-8 w-8 rounded-lg bg-[#1A1A1A] border border-[#333] text-[#FACC15] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
@@ -261,9 +261,9 @@ export default function DashboardView({
             </div>
           </button>
 
-          {/* Card 2: Wrong Questions */}
+          {/* Card 2: Wrong Questions (opens History with wrong questions tab) */}
           <button
-            onClick={() => onNavigateTab('history_wrong')}
+            onClick={() => onNavigateTab('history')}
             className="group rounded-2xl border border-[#262626] bg-[#0A0A0A] hover:bg-[#121212] hover:border-[#3F3F3F] p-4 text-left transition-all"
           >
             <div className="h-8 w-8 rounded-lg bg-[#1F1212] border border-[#3F1A1A] text-[#EF4444] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
@@ -274,7 +274,7 @@ export default function DashboardView({
               {stats.wrongQuestionsCount > 0 ? `${stats.wrongQuestionsCount} টি প্রশ্ন রিভিউ করুন` : 'ভুল প্রশ্ন আবার অনুশীলন'}
             </p>
             <div className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-[#EF4444]">
-              <span>Practice</span>
+              <span>Review</span>
               <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>
@@ -304,7 +304,7 @@ export default function DashboardView({
               <Bookmark className="h-4 w-4" />
             </div>
             <h3 className="text-xs font-bold text-[#F5F5F5]">Bookmarks</h3>
-            <p className="text-[11px] text-[#A3A3A3] mt-0.5">সংরক্ষিত গুরুত্বপূর্ণ প্রশ্ন</p>
+            <p className="text-[11px] text-[#A3A3A3] mt-0.5">সংরক্ষিত প্রশ্নসমূহ</p>
             <div className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-amber-400">
               <span>Saved</span>
               <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
@@ -319,64 +319,74 @@ export default function DashboardView({
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-[#F5F5F5]">Recommended for You</h2>
-              <p className="text-xs text-[#A3A3A3]">আপনার পরীক্ষার প্রস্তুতির জন্য প্রস্তাবিত মক টেস্ট</p>
+              <h2 className="text-base font-bold text-[#F5F5F5]">Available MCQ Exams</h2>
+              <p className="text-xs text-[#A3A3A3]">আপনার পরীক্ষার প্রস্তুতির জন্য উপলব্ধ মক টেস্ট</p>
             </div>
             <button
-              onClick={() => onNavigateTab('mcq_exam')}
+              onClick={() => onNavigateTab('mcq')}
               className="text-xs text-[#FACC15] hover:underline font-semibold flex items-center gap-1"
             >
-              <span>সকল পরীক্ষা</span>
+              <span>সকল পরীক্ষা ({quizzes.length})</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          <div className="space-y-3.5">
-            {recommendedExams.map((quiz) => (
-              <div
-                key={quiz.id}
-                className="rounded-2xl border border-[#262626] bg-[#0A0A0A] hover:border-[#3F3F3F] p-4 sm:p-5 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="font-semibold text-[#FACC15]">{quiz.subject}</span>
-                    <span className="text-[#444]">·</span>
-                    <span className="text-[#A3A3A3] capitalize">{quiz.difficulty}</span>
-                    <span className="text-[#444]">·</span>
-                    <span className="text-[#6B6B6B]">{quiz.type === 'mock' ? 'মক টেস্ট' : 'অনুশীলন কুইজ'}</span>
+          {recommendedExams.length === 0 ? (
+            <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-8 text-center space-y-2">
+              <FileQuestion className="h-8 w-8 text-[#6B6B6B] mx-auto mb-1" />
+              <p className="text-xs font-semibold text-[#F5F5F5]">এখনও কোনো MCQ Exam available নেই</p>
+              <p className="text-[11px] text-[#A3A3A3]">
+                অ্যাডমিন কনসোল থেকে পরীক্ষা তৈরি করা হলে এখানে প্রদর্শিত হবে।
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              {recommendedExams.map((quiz) => (
+                <div
+                  key={quiz.id}
+                  className="rounded-2xl border border-[#262626] bg-[#0A0A0A] hover:border-[#3F3F3F] p-4 sm:p-5 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-semibold text-[#FACC15]">{quiz.subject || 'সাধারণ'}</span>
+                      <span className="text-[#444]">·</span>
+                      <span className="text-[#A3A3A3] capitalize">{quiz.difficulty}</span>
+                      <span className="text-[#444]">·</span>
+                      <span className="text-[#6B6B6B]">{quiz.type === 'mock' ? 'মক টেস্ট' : 'অনুশীলন কুইজ'}</span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-bold text-[#F5F5F5]">
+                      {quiz.title}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#A3A3A3] font-mono">
+                      <span>{quiz.totalQuestions || quiz.questionIds?.length || 0} Questions</span>
+                      <span>·</span>
+                      <span>{quiz.settings?.durationMinutes || 20} Minutes</span>
+                      <span>·</span>
+                      <span>{quiz.settings?.totalMarks || 20} Marks</span>
+                      <span>·</span>
+                      <span className="text-[#EF4444]">Negative: {quiz.settings?.negativeRatio || 0.25}</span>
+                    </div>
                   </div>
-                  <h3 className="text-sm sm:text-base font-bold text-[#F5F5F5]">
-                    {quiz.title}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#A3A3A3] font-mono">
-                    <span>{quiz.totalQuestions} Questions</span>
-                    <span>·</span>
-                    <span>{quiz.settings.durationMinutes} Minutes</span>
-                    <span>·</span>
-                    <span>{quiz.settings.totalMarks} Marks</span>
-                    <span>·</span>
-                    <span className="text-[#EF4444]">Negative: {quiz.settings.negativeRatio}</span>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                  <button
-                    onClick={() => onViewQuizDetails(quiz)}
-                    className="h-9 px-3.5 rounded-xl border border-[#262626] bg-[#121212] hover:bg-[#1A1A1A] text-xs text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors"
-                  >
-                    View Details
-                  </button>
-                  <button
-                    onClick={() => onStartExam(quiz)}
-                    className="h-9 px-4 rounded-xl bg-[#FACC15] text-black font-bold text-xs hover:bg-[#EAB308] flex items-center gap-1.5 transition-all shadow"
-                  >
-                    <span>Start</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <button
+                      onClick={() => onViewQuizDetails(quiz)}
+                      className="h-9 px-3.5 rounded-xl border border-[#262626] bg-[#121212] hover:bg-[#1A1A1A] text-xs text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors"
+                    >
+                      View Details
+                    </button>
+                    <button
+                      onClick={() => onStartExam(quiz)}
+                      className="h-9 px-4 rounded-xl bg-[#FACC15] text-black font-bold text-xs hover:bg-[#EAB308] flex items-center gap-1.5 transition-all shadow"
+                    >
+                      <span>Start</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right 1 Col: Recent Results & Performance Message */}
@@ -384,7 +394,7 @@ export default function DashboardView({
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-[#F5F5F5]">Recent Results</h2>
             <button
-              onClick={() => onNavigateTab('history_exams')}
+              onClick={() => onNavigateTab('history')}
               className="text-xs text-[#FACC15] hover:underline font-semibold"
             >
               View All
@@ -392,17 +402,17 @@ export default function DashboardView({
           </div>
 
           {recentResults.length === 0 ? (
-            <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-6 text-center">
-              <HelpCircle className="h-6 w-6 text-[#6B6B6B] mx-auto mb-2" />
-              <p className="text-xs font-semibold text-[#F5F5F5]">কোনো পরীক্ষা এখনো দেওয়া হয়নি</p>
-              <p className="text-[11px] text-[#A3A3A3] mt-1">
+            <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-6 text-center space-y-2">
+              <HelpCircle className="h-6 w-6 text-[#6B6B6B] mx-auto mb-1" />
+              <p className="text-xs font-semibold text-[#F5F5F5]">এখনও কোনো পরীক্ষা দেওয়া হয়নি।</p>
+              <p className="text-[11px] text-[#A3A3A3]">
                 প্রথম একটি MCQ Exam শুরু করুন এবং আপনার অগ্রগতি ট্র্যাক করুন।
               </p>
               <button
-                onClick={() => onNavigateTab('mcq_exam')}
-                className="mt-3.5 h-8 px-4 rounded-lg bg-[#262626] text-xs font-semibold text-white hover:bg-[#333] transition-colors"
+                onClick={() => onNavigateTab('mcq')}
+                className="mt-2 h-8 px-4 rounded-lg bg-[#262626] text-xs font-semibold text-white hover:bg-[#333] transition-colors"
               >
-                পরীক্ষা শুরু করুন
+                প্রথম MCQ Exam শুরু করুন
               </button>
             </div>
           ) : (
@@ -439,20 +449,20 @@ export default function DashboardView({
             </div>
           )}
 
-          {/* Performance Insight Box (Spec Section 124) */}
-          <div className="rounded-2xl border border-[#262626] bg-[#0D0D0D] p-4">
+          {/* Performance Insight Box */}
+          <div className="rounded-2xl border border-[#262626] bg-[#0D0D0D] p-4 space-y-1.5">
             <div className="flex items-center gap-2 text-xs font-bold text-[#FACC15]">
               <Sparkles className="h-3.5 w-3.5" />
               <span>প্রস্তুতি পর্যবেক্ষণ</span>
             </div>
-            <p className="text-xs text-[#A3A3A3] mt-1.5 leading-relaxed">
+            <p className="text-xs text-[#A3A3A3] leading-relaxed">
               নিয়মিত মক টেস্টে অংশ নিলে এবং ভুল প্রশ্নগুলো ঝালিয়ে নিলে আপনার অ্যাকুরেসি দ্রুত বৃদ্ধি পাবে।
             </p>
             <button
-              onClick={() => onNavigateTab('history_wrong')}
-              className="mt-3 text-xs text-[#FACC15] hover:underline font-semibold flex items-center gap-1"
+              onClick={() => onNavigateTab('history')}
+              className="mt-2 text-xs text-[#FACC15] hover:underline font-semibold flex items-center gap-1"
             >
-              <span>ভুল প্রশ্নসমূহ দেখুন</span>
+              <span>হিস্টোরি ও ভুল প্রশ্ন দেখুন</span>
               <ArrowRight className="h-3 w-3" />
             </button>
           </div>

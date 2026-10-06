@@ -16,6 +16,8 @@ import NotificationsView from '../components/NotificationsView';
 import HelpAndPrivacyView from '../components/HelpAndPrivacyView';
 import ProfileAndSettingsView from '../components/ProfileAndSettingsView';
 import AdminPortal from '../components/AdminPortal';
+import AuthLoginView from '../components/AuthLoginView';
+import { useAuth } from '../lib/auth-context';
 import {
   Quiz,
   ExamAttempt,
@@ -36,8 +38,6 @@ import {
   getStoredAttempts,
   saveStoredAttempts,
   getStoredLogs,
-  getStoredUserRole,
-  setStoredUserRole,
   getStoredProfile,
   saveStoredProfile,
   getStoredPreferences,
@@ -49,8 +49,17 @@ import {
   markAllNotificationsRead,
   startExamAttempt,
 } from '../lib/store';
+import {
+  fetchPublishedQuizzes,
+  fetchAllQuestionsAdmin,
+  saveAttemptToFirestore,
+  fetchUserAttempts,
+  fetchUserBookmarks,
+} from '../lib/firestore-service';
 
 export default function Home() {
+  const { user, profile: authProfile, isAdmin, loading: authLoading, logout, updateUserProfile } = useAuth();
+
   // Navigation State
   const [currentTab, setCurrentTab] = useState<NavigationTab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -59,7 +68,7 @@ export default function Home() {
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Hydration state
+  // Store data
   const [quizzes, setQuizzes] = useState<Quiz[]>(seedQuizzes);
   const [questions, setQuestions] = useState<Question[]>(seedQuestions);
   const [questionKeys, setQuestionKeys] = useState<Record<string, QuestionKey>>(seedQuestionKeys);
@@ -67,30 +76,34 @@ export default function Home() {
   const [logs, setLogs] = useState<SystemAuditLog[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [profile, setProfile] = useState<UserProfile>({
-    id: 'usr-student-01',
-    email: 'argotalukder70@gmail.com',
-    displayName: 'Argo Talukder',
-    role: 'student',
-    institution: 'ঢাকা বিশ্ববিদ্যালয়',
-    targetExam: '47th BCS & Job Recruitment',
-    district: 'Dhaka',
-    streak: 7,
-    createdAt: 'March 2026',
-  });
   const [preferences, setPreferences] = useState<ExamPreferences>({
     hideTimer: false,
     confirmSubmit: true,
     fontScale: 'md',
     soundEnabled: true,
   });
-  const [userRole, setUserRole] = useState<'student' | 'admin'>('student');
   const [currentTime, setCurrentTime] = useState<number>(0);
 
   // Active Flow States
   const [activeAttempt, setActiveAttempt] = useState<ExamAttempt | null>(null);
   const [viewingResultAttempt, setViewingResultAttempt] = useState<ExamAttempt | null>(null);
   const [instructionQuiz, setInstructionQuiz] = useState<Quiz | null>(null);
+
+  // Active profile fallback
+  const currentProfile: UserProfile = useMemo(() => {
+    if (authProfile) return authProfile;
+    if (user) {
+      return {
+        id: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || user.email?.split('@')[0] || 'শিক্ষার্থী',
+        role: isAdmin ? 'admin' : 'student',
+        streak: 1,
+        createdAt: new Date().toISOString(),
+      };
+    }
+    return getStoredProfile();
+  }, [authProfile, user, isAdmin]);
 
   // Refresh helper
   const refreshStoreData = () => {
@@ -101,19 +114,69 @@ export default function Home() {
     setLogs(getStoredLogs());
     setBookmarks(getStoredBookmarks());
     setNotifications(getStoredNotifications());
-    setProfile(getStoredProfile());
     setPreferences(getStoredPreferences());
-    setUserRole(getStoredUserRole());
     setCurrentTime(Date.now());
   };
 
-  // Sync client storage after hydration
+  // Sync client storage and Cloud Firestore
   useEffect(() => {
-    const timer = setTimeout(() => {
+    // Try fetching live quizzes from Firestore and syncing local store
+    async function loadData() {
       refreshStoreData();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+
+      // Check URL parameters for tab navigation (e.g., ?tab=mcq, ?exam=..., ?next=...)
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        const examParam = urlParams.get('exam');
+        const nextParam = urlParams.get('next');
+
+        const targetTab = tabParam || (nextParam ? nextParam.replace('/', '') : null);
+
+        if (targetTab && [
+          'dashboard', 'mcq', 'history', 'progress', 'bookmarks',
+          'leaderboard', 'notifications', 'help', 'privacy', 'profile', 'settings', 'admin'
+        ].includes(targetTab)) {
+          setCurrentTab(targetTab as NavigationTab);
+        }
+
+        if (examParam) {
+          const found = seedQuizzes.find((q) => q.id === examParam || q.slug === examParam);
+          if (found) {
+            setInstructionQuiz(found);
+            setCurrentTab('mcq');
+          }
+        }
+      }
+
+      try {
+        const cloudQuizzes = await fetchPublishedQuizzes();
+        if (cloudQuizzes.length > 0) {
+          // Merge cloud quizzes with local seed
+          setQuizzes((prev) => {
+            const map = new Map<string, Quiz>();
+            prev.forEach((q) => map.set(q.id, q));
+            cloudQuizzes.forEach((q) => map.set(q.id, q));
+            return Array.from(map.values());
+          });
+        }
+
+        if (user) {
+          const userAttempts = await fetchUserAttempts(user.uid);
+          if (userAttempts.length > 0) {
+            setAttempts(userAttempts);
+          }
+          const userBms = await fetchUserBookmarks(user.uid);
+          if (userBms.length > 0) {
+            setBookmarks(userBms);
+          }
+        }
+      } catch (err) {
+        console.warn('Background cloud fetch note:', err);
+      }
+    }
+    loadData();
+  }, [user]);
 
   // Unread notifications count
   const unreadNotifsCount = useMemo(() => {
@@ -139,8 +202,12 @@ export default function Home() {
   const handleStartExam = (quiz: Quiz) => {
     const attempt = startExamAttempt(
       quiz,
-      userRole === 'admin' ? 'অ্যাডমিন প্রিভিউ' : profile.displayName
+      currentProfile.displayName || 'শিক্ষার্থী'
     );
+    if (user) {
+      attempt.userId = user.uid;
+      saveAttemptToFirestore(attempt);
+    }
     setActiveAttempt(attempt);
     setInstructionQuiz(null);
   };
@@ -183,19 +250,8 @@ export default function Home() {
     handleStartExam(customQuiz);
   };
 
-  // Toggle role helper
-  const handleToggleRole = () => {
-    const nextRole = userRole === 'admin' ? 'student' : 'admin';
-    setUserRole(nextRole);
-    setStoredUserRole(nextRole);
-    refreshStoreData();
-    if (nextRole !== 'admin' && currentTab === 'admin') {
-      setCurrentTab('dashboard');
-    }
-  };
-
   // Logout handler
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (activeAttempt) {
       if (!confirm('আপনি বর্তমানে একটি Exam-এ আছেন। Logout করলে সেশন প্রভাবিত হতে পারে। আপনি কি প্রস্থান করতে চান?')) {
         return;
@@ -204,11 +260,52 @@ export default function Home() {
     setActiveAttempt(null);
     setViewingResultAttempt(null);
     setCurrentTab('dashboard');
+    await logout();
     refreshStoreData();
   };
 
   // -------------------------------------------------------------
-  // FOCUSED EXAM RUNNER (Distraction-Free Fullscreen, Spec Section 33)
+  // 1. AUTH LOADING STATE
+  // -------------------------------------------------------------
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#000000] text-[#F5F5F5] flex flex-col items-center justify-center space-y-4">
+        <div className="h-12 w-12 rounded-2xl bg-[#FACC15] text-black font-extrabold flex items-center justify-center text-xl animate-pulse shadow-xl shadow-[#FACC15]/20">
+          প্র
+        </div>
+        <div className="text-xs text-[#A3A3A3] font-mono">
+          নিরাপদ প্রশ্নোত্তর সেশন লোড হচ্ছে...
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 2. UNAUTHENTICATED GUARD (Spec requirement: Strictly Required Auth)
+  // -------------------------------------------------------------
+  if (!user) {
+    const nextDestination = currentTab === 'dashboard' ? '/dashboard' : `/${currentTab}`;
+    return (
+      <AuthLoginView
+        nextUrl={nextDestination}
+        onSuccessRedirect={(dest) => {
+          const tab = dest.replace('/', '');
+          if (tab && [
+            'dashboard', 'mcq', 'history', 'progress', 'bookmarks',
+            'leaderboard', 'notifications', 'help', 'privacy', 'profile', 'settings', 'admin'
+          ].includes(tab)) {
+            setCurrentTab(tab as NavigationTab);
+          } else {
+            setCurrentTab('dashboard');
+          }
+          refreshStoreData();
+        }}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 3. FOCUSED EXAM RUNNER (Distraction-Free Fullscreen, Spec Section 33)
   // -------------------------------------------------------------
   if (activeAttempt) {
     return (
@@ -217,6 +314,10 @@ export default function Home() {
         onFinishExam={(evaluated) => {
           setActiveAttempt(null);
           setViewingResultAttempt(evaluated);
+          if (user) {
+            evaluated.userId = user.uid;
+            saveAttemptToFirestore(evaluated);
+          }
           refreshStoreData();
         }}
         onExit={() => {
@@ -228,7 +329,7 @@ export default function Home() {
   }
 
   // -------------------------------------------------------------
-  // EVALUATION RESULT VIEW
+  // 4. EVALUATION RESULT VIEW
   // -------------------------------------------------------------
   if (viewingResultAttempt) {
     return (
@@ -252,7 +353,7 @@ export default function Home() {
   }
 
   // -------------------------------------------------------------
-  // MASTER APP-SHELL (Left Sidebar + Top Header + Main Content)
+  // 5. MASTER APP-SHELL (Left Sidebar + Top Header + Main Content)
   // -------------------------------------------------------------
   return (
     <div className="min-h-screen bg-[#000000] text-[#F5F5F5] flex font-sans">
@@ -263,13 +364,13 @@ export default function Home() {
           setCurrentTab(tab);
           setSearchQuery('');
         }}
-        userRole={userRole}
+        isAdmin={isAdmin}
         unreadNotifsCount={unreadNotifsCount}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
-        profile={profile}
+        profile={currentProfile}
         onLogout={handleLogout}
       />
 
@@ -284,9 +385,8 @@ export default function Home() {
           }}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
           unreadCount={unreadNotifsCount}
-          profile={profile}
-          userRole={userRole}
-          onToggleRole={handleToggleRole}
+          profile={currentProfile}
+          isAdmin={isAdmin}
           onLogout={handleLogout}
           searchQuery={searchQuery}
           onSearchChange={(q) => setSearchQuery(q)}
@@ -296,7 +396,7 @@ export default function Home() {
         <main className="flex-1 overflow-x-hidden">
           {currentTab === 'dashboard' && (
             <DashboardView
-              profile={profile}
+              profile={currentProfile}
               quizzes={quizzes}
               attempts={attempts}
               inProgressAttempt={inProgressAttempt}
@@ -309,7 +409,7 @@ export default function Home() {
             />
           )}
 
-          {currentTab === 'mcq_exam' && (
+          {currentTab === 'mcq' && (
             <MCQExamCatalog
               quizzes={quizzes}
               attempts={attempts}
@@ -320,16 +420,16 @@ export default function Home() {
             />
           )}
 
-          {(currentTab === 'history_exams' || currentTab === 'history_wrong') && (
+          {currentTab === 'history' && (
             <HistoryAndWrongQuestions
               attempts={attempts}
               questions={questions}
               questionKeys={questionKeys}
-              activeTab={currentTab}
-              onSelectTab={(tab) => setCurrentTab(tab)}
+              initialTab="exams"
               onViewAttemptResult={(att) => setViewingResultAttempt(att)}
               onRetakeQuiz={handleRetakeQuiz}
               onStartCustomWrongPractice={handleStartCustomWrongPractice}
+              onNavigateToMCQ={() => setCurrentTab('mcq')}
             />
           )}
 
@@ -338,10 +438,10 @@ export default function Home() {
               attempts={attempts}
               quizzes={quizzes}
               questions={questions}
-              streak={profile.streak}
+              streak={currentProfile.streak || 1}
               onPracticeSubject={(subject) => {
                 setSearchQuery(subject);
-                setCurrentTab('mcq_exam');
+                setCurrentTab('mcq');
               }}
             />
           )}
@@ -355,12 +455,12 @@ export default function Home() {
                 toggleBookmark(qId, '', '');
                 refreshStoreData();
               }}
-              onNavigateToExams={() => setCurrentTab('mcq_exam')}
+              onNavigateToExams={() => setCurrentTab('mcq')}
             />
           )}
 
           {currentTab === 'leaderboard' && (
-            <LeaderboardView currentUser={profile} />
+            <LeaderboardView currentUser={currentProfile} />
           )}
 
           {currentTab === 'notifications' && (
@@ -385,22 +485,23 @@ export default function Home() {
           {(currentTab === 'profile' || currentTab === 'settings') && (
             <ProfileAndSettingsView
               viewType={currentTab}
-              profile={profile}
+              profile={currentProfile}
               preferences={preferences}
-              userRole={userRole}
+              userRole={isAdmin ? 'admin' : 'student'}
               onUpdateProfile={(updated) => {
                 saveStoredProfile(updated);
+                updateUserProfile(updated);
                 refreshStoreData();
               }}
               onUpdatePreferences={(updated) => {
                 saveStoredPreferences(updated);
                 refreshStoreData();
               }}
-              onToggleRole={handleToggleRole}
+              onToggleRole={() => {}}
             />
           )}
 
-          {currentTab === 'admin' && userRole === 'admin' && (
+          {currentTab === 'admin' && isAdmin && (
             <AdminPortal
               questions={questions}
               questionKeys={questionKeys}

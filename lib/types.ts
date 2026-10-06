@@ -12,9 +12,8 @@ export type PaletteState =
 
 export type NavigationTab =
   | 'dashboard'
-  | 'mcq_exam'
-  | 'history_exams'
-  | 'history_wrong'
+  | 'mcq'
+  | 'history'
   | 'progress'
   | 'bookmarks'
   | 'leaderboard'

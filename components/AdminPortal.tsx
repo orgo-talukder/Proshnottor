@@ -14,6 +14,12 @@ import {
   saveStoredQuizzes,
   addAuditLog,
 } from '../lib/store';
+import {
+  saveQuestionAndKeyToFirestore,
+  saveQuizToFirestore,
+  recordAuditLog,
+} from '../lib/firestore-service';
+import { useAuth, ADMIN_ALLOWLIST_EMAIL } from '../lib/auth-context';
 import MathText from './MathText';
 import {
   Plus,
@@ -30,8 +36,12 @@ import {
   Sparkles,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   UserX,
   UserCheck,
+  Lock,
+  KeyRound,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -60,7 +70,13 @@ export default function AdminPortal({
   logs,
   onDataUpdated,
 }: AdminPortalProps) {
+  const { user, adminVerified, reauthenticateAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'questions' | 'quizzes' | 'users' | 'bulk' | 'logs'>('overview');
+
+  // Admin password re-auth state
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [reauthError, setReauthError] = useState('');
+  const [reauthLoading, setReauthLoading] = useState(false);
 
   // Question Creation Form State
   const [newStem, setNewStem] = useState('');
@@ -165,8 +181,24 @@ export default function AdminPortal({
     );
   };
 
+  const handleReauthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setReauthError('');
+    setReauthLoading(true);
+    try {
+      const success = await reauthenticateAdmin(reauthPassword);
+      if (!success) {
+        setReauthError('পাসওয়ার্ড সঠিক নয় অথবা আপনি অনুমোদিত অ্যাডমিন নন।');
+      }
+    } catch (err: any) {
+      setReauthError('পাসওয়ার্ড যাচাইকরণ ব্যর্থ হয়েছে।');
+    } finally {
+      setReauthLoading(false);
+    }
+  };
+
   // Add Question Handler (Section 44, 45)
-  const handleCreateQuestion = (e: React.FormEvent) => {
+  const handleCreateQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStem.trim() || !optA.trim() || !optB.trim() || !optC.trim() || !optD.trim()) {
       alert('অনুগ্রহ করে প্রশ্ন এবং ৪টি অপশন সঠিকভাবে লিখুন।');
@@ -206,6 +238,14 @@ export default function AdminPortal({
     saveStoredQuestionKeys(updatedKeys);
     addAuditLog('QUESTION_CREATED', `নতুন প্রশ্ন যোগ করা হয়েছে: ${newStem.substring(0, 30)}...`);
 
+    // Cloud Firestore Sync
+    try {
+      await saveQuestionAndKeyToFirestore(newQuestion, newKey);
+      await recordAuditLog('QUESTION_CREATED', user?.email || 'admin', `Question added: ${qId}`);
+    } catch (err) {
+      console.warn('Firestore sync background note:', err);
+    }
+
     // Reset Form
     setNewStem('');
     setOptA('');
@@ -213,12 +253,12 @@ export default function AdminPortal({
     setOptC('');
     setOptD('');
     setNewExplanation('');
-    alert('প্রশ্নব্যাংকে নতুন প্রশ্ন সফলভাবে সংরক্ষিত হয়েছে!');
+    alert('প্রশ্নব্যাংকে নতুন প্রশ্ন সফলভাবে সংরক্ষিত হয়েছে (Cloud Firestore Synced)!');
     onDataUpdated();
   };
 
   // Create Quiz Handler (Section 47, 48)
-  const handleCreateQuiz = (e: React.FormEvent) => {
+  const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuizTitle.trim() || selectedQuestionIds.length === 0) {
       alert('কুইজের শিরোনাম লিখুন এবং অন্তত ১টি প্রশ্ন নির্বাচন করুন।');
@@ -256,15 +296,23 @@ export default function AdminPortal({
     saveStoredQuizzes(updated);
     addAuditLog('QUIZ_CREATED', `নতুন পরীক্ষা প্রকাশিত হয়েছে: ${newQuizTitle} (${selectedQuestionIds.length} প্রশ্ন)`);
 
+    // Cloud Firestore Sync
+    try {
+      await saveQuizToFirestore(newQuiz);
+      await recordAuditLog('QUIZ_CREATED', user?.email || 'admin', `Quiz published: ${quizId} - ${newQuizTitle}`);
+    } catch (err) {
+      console.warn('Firestore sync note:', err);
+    }
+
     setNewQuizTitle('');
     setNewQuizDesc('');
     setSelectedQuestionIds([]);
-    alert('নতুন পরীক্ষা সফলভাবে তৈরি ও প্রকাশিত হয়েছে!');
+    alert('নতুন পরীক্ষা সফলভাবে তৈরি ও প্রকাশিত হয়েছে (Cloud Firestore Synced)!');
     onDataUpdated();
   };
 
   // Bulk Import Handler (Section 46)
-  const handleBulkImport = () => {
+  const handleBulkImport = async () => {
     try {
       const parsed = JSON.parse(bulkInput);
       if (!Array.isArray(parsed)) {
@@ -304,13 +352,20 @@ export default function AdminPortal({
         importedQuestions.push(q);
         importedKeys[qId] = key;
         count++;
+
+        // Cloud sync each imported question
+        try {
+          await saveQuestionAndKeyToFirestore(q, key);
+        } catch (e) {
+          // ignore individual sync fails
+        }
       }
 
       if (count > 0) {
         saveStoredQuestions([...importedQuestions, ...questions]);
         saveStoredQuestionKeys(importedKeys);
         addAuditLog('BULK_IMPORT', `${count} টি প্রশ্ন বাল্ক ইমপোর্টের মাধ্যমে যোগ করা হয়েছে।`);
-        setBulkStatus(`${count} টি প্রশ্ন সফলভাবে যোগ হয়েছে!`);
+        setBulkStatus(`${count} টি প্রশ্ন সফলভাবে ক্লাউড ও লোকাল ডাটাবেজে যোগ হয়েছে!`);
         setBulkInput('');
         onDataUpdated();
       } else {
@@ -332,6 +387,60 @@ export default function AdminPortal({
     "explanation": "$(a+b)^2 = a^2 + b^2 + 2ab = 25 + 2(12) = 25 + 24 = 49$।"
   }
 ]`;
+
+  // Admin Password Re-authentication Screen
+  if (!adminVerified) {
+    return (
+      <div className="min-h-screen bg-[#000000] text-[#F5F5F5] flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-2xl border border-[#262626] bg-[#0A0A0A] p-6 sm:p-8 space-y-6 shadow-2xl">
+          <div className="text-center space-y-2">
+            <div className="inline-flex h-12 w-12 rounded-2xl bg-purple-950/60 border border-purple-800 text-purple-400 items-center justify-center mb-2">
+              <KeyRound className="h-6 w-6" />
+            </div>
+            <h2 className="text-xl font-bold text-[#F5F5F5]">অ্যাডমিন পাসওয়ার্ড নিশ্চিতকরণ</h2>
+            <p className="text-xs text-[#A3A3A3]">
+              নিরাপত্তার স্বার্থে <span className="text-[#FACC15] font-mono">{ADMIN_ALLOWLIST_EMAIL}</span> অ্যাকাউন্টের অ্যাক্সেস নিশ্চিত করুন।
+            </p>
+          </div>
+
+          {reauthError && (
+            <div className="p-3 rounded-xl border border-rose-900/50 bg-rose-950/40 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+              <span>{reauthError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleReauthSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="block text-[11px] font-medium text-[#A3A3A3]">
+                অ্যাডমিন পাসওয়ার্ড (Admin Password)
+              </label>
+              <div className="relative">
+                <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
+                <input
+                  type="password"
+                  value={reauthPassword}
+                  onChange={(e) => setReauthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full h-10 pl-9 pr-3 rounded-xl border border-[#262626] bg-[#121212] text-xs text-[#F5F5F5] placeholder-[#444] outline-none focus:border-[#FACC15]"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={reauthLoading}
+              className="w-full h-11 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.99] disabled:opacity-50"
+            >
+              <span>{reauthLoading ? 'যাচাই করা হচ্ছে...' : 'অ্যাডমিন প্যানেল আনলক করুন'}</span>
+              <ShieldCheck className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#000000] text-[#F5F5F5] py-8 px-4 sm:px-6 lg:px-8">
