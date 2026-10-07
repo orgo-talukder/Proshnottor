@@ -27,7 +27,7 @@ interface AdminAppShellProps {
 
 export default function AdminAppShell({ children, pageTitle }: AdminAppShellProps) {
   const pathname = usePathname();
-  const router = Router();
+  const router = useRouter();
   const { user, profile, isAdmin, loading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -62,7 +62,7 @@ export default function AdminAppShell({ children, pageTitle }: AdminAppShellProp
           <div className="space-y-2">
             <h1 className="text-xl font-bold text-[#F5F5F5]">Access Restricted</h1>
             <p className="text-xs text-[#A3A3A3]">
-              You do not have administrative permissions to view the Admin Management Console. Authorized email: <code className="text-[#FACC15]">argotalukder70@gmail.com</code>
+              You do not have administrative permissions to view the Admin Management Console. Authorized accounts only.
             </p>
           </div>
           <Link

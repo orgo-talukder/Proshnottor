@@ -1,5 +1,6 @@
-import AppMasterShell from '../../../components/AppMasterShell';
+import { redirect } from 'next/navigation';
 
 export default function HistoryWrongQuestionsPage() {
-  return <AppMasterShell initialTab="history" />;
+  redirect('/history');
 }
+

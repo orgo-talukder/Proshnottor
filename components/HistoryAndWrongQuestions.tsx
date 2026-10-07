@@ -87,7 +87,7 @@ export default function HistoryAndWrongQuestions({
       if (searchFilter.trim()) {
         const q = searchFilter.toLowerCase();
         const inStem = item.question.stem.toLowerCase().includes(q);
-        const inTopic = item.question.topic.toLowerCase().includes(q);
+        const inTopic = Boolean(item.question.topic && item.question.topic.toLowerCase().includes(q));
         if (!inStem && !inTopic) return false;
       }
       return true;
@@ -103,7 +103,7 @@ export default function HistoryAndWrongQuestions({
             History & Mistake Review
           </h1>
           <p className="text-xs sm:text-sm text-[#A3A3A3] mt-1">
-            আপনার সম্পন্ন হওয়া পরীক্ষার ফলাফল ও ভুল হওয়া প্রশ্নের নিবিড় পর্যালোচনা।
+            Review and analyze your completed examination score cards and incorrect answers.
           </p>
         </div>
 
@@ -141,15 +141,15 @@ export default function HistoryAndWrongQuestions({
           {completedAttempts.length === 0 ? (
             <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-12 text-center max-w-md mx-auto space-y-3">
               <History className="h-10 w-10 text-[#6B6B6B] mx-auto mb-1" />
-              <h3 className="text-sm font-bold text-[#F5F5F5]">এখনও কোনো Exam History নেই।</h3>
+              <h3 className="text-sm font-bold text-[#F5F5F5]">No Exam History Recorded Yet.</h3>
               <p className="text-xs text-[#A3A3A3] leading-relaxed">
-                প্রথম একটি MCQ Exam শুরু করুন এবং পরীক্ষা শেষে এখানে আপনার ফলাফল ও অ্যানালিটিক্স সংরক্ষিত হবে।
+                Launch an exam to view detailed score cards and performance analytics.
               </p>
               <button
                 onClick={onNavigateToMCQ}
                 className="mt-2 h-9 px-4 rounded-xl bg-[#262626] text-xs font-semibold text-white hover:bg-[#333] transition-colors"
               >
-                MCQ পরীক্ষা শুরু করুন
+                Launch Practice Drill
               </button>
             </div>
           ) : (
@@ -172,7 +172,7 @@ export default function HistoryAndWrongQuestions({
                     <div className="space-y-1.5 flex-1">
                       <div className="flex items-center gap-2 text-xs">
                         <span className="font-semibold text-[#FACC15]">
-                          {att.quizType === 'mock' ? 'মক টেস্ট' : 'কুইজ'}
+                          {att.quizType === 'mock' ? 'Mock Test' : 'Quiz'}
                         </span>
                         <span className="text-[#444]">·</span>
                         <span className="text-[#A3A3A3] flex items-center gap-1 font-mono text-[11px]">
@@ -246,14 +246,14 @@ export default function HistoryAndWrongQuestions({
                 </span>
                 <span className="text-[#555]">·</span>
                 <span className="text-xs text-[#A3A3A3] font-mono">
-                  {wrongQuestionsData.length} টি প্রশ্নের পুনর্বিবেচনা প্রয়োজন
+                  {wrongQuestionsData.length} items flagged for revision
                 </span>
               </div>
               <h3 className="text-base font-bold text-[#F5F5F5] mt-1">
-                ভুল থেকেই আসল প্রস্তুতি
+                Targeted Mistake Remediation
               </h3>
               <p className="text-xs text-[#A3A3A3] mt-0.5">
-                যে প্রশ্নগুলোর উত্তর ভুল হয়েছিল, সেগুলোর সঠিক সমাধান ও ব্যাখ্যা দেখে পুনরায় অনুশীলন করুন।
+                Review official explanations and re-practice questions where mistakes occurred.
               </p>
             </div>
 
@@ -263,7 +263,7 @@ export default function HistoryAndWrongQuestions({
                 className="h-10 px-5 rounded-xl bg-[#EF4444] text-white font-bold text-xs hover:bg-[#DC2626] flex items-center gap-2 transition-all shadow shrink-0"
               >
                 <Play className="h-3.5 w-3.5 fill-white" />
-                <span>ভুল প্রশ্নগুলো পুনরায় প্র্যাকটিস করুন ({filteredWrongQuestions.length})</span>
+                <span>Re-practice Flagged Questions ({filteredWrongQuestions.length})</span>
               </button>
             )}
           </div>
@@ -276,7 +276,7 @@ export default function HistoryAndWrongQuestions({
                 onChange={(e) => setSubjectFilter(e.target.value)}
                 className="h-9 px-3 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs text-[#F5F5F5] outline-none focus:border-[#FACC15]"
               >
-                <option value="all">সকল বিষয় (All Subjects)</option>
+                <option value="all">All Subjects</option>
                 {availableSubjects.map((sub) => (
                   <option key={sub} value={sub}>
                     {sub}
@@ -288,7 +288,7 @@ export default function HistoryAndWrongQuestions({
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="প্রশ্ন বা টপিক খুঁজুন..."
+                placeholder="Search question stems or topics..."
                 className="h-9 px-3 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs text-[#F5F5F5] outline-none focus:border-[#FACC15] w-64"
               />
             </div>
@@ -298,9 +298,9 @@ export default function HistoryAndWrongQuestions({
           {filteredWrongQuestions.length === 0 ? (
             <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-12 text-center max-w-md mx-auto space-y-2">
               <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-1" />
-              <h3 className="text-sm font-bold text-[#F5F5F5]">এখনও কোনো ভুল প্রশ্ন নেই।</h3>
+              <h3 className="text-sm font-bold text-[#F5F5F5]">No Incorrect Questions Recorded</h3>
               <p className="text-xs text-[#A3A3A3] leading-relaxed">
-                আপনার পরীক্ষাগুলোতে কোনো ভুল উত্তর রেকর্ড করা হয়নি অথবা এখনও পরীক্ষা সম্পন্ন করেননি।
+                No incorrect responses detected in your completed exam records.
               </p>
             </div>
           ) : (
@@ -325,7 +325,7 @@ export default function HistoryAndWrongQuestions({
                         <span className="text-[#A3A3A3]">{question.topic}</span>
                       </div>
                       <span className="text-[11px] font-mono text-[#6B6B6B]">
-                        ভুল হয়েছিল: {lastAttemptDate}
+                        Attempted: {lastAttemptDate}
                       </span>
                     </div>
 
@@ -359,12 +359,12 @@ export default function HistoryAndWrongQuestions({
 
                             {isUserPicked && !isCorrect && (
                               <span className="text-[10px] text-rose-400 font-bold flex items-center gap-1 shrink-0">
-                                <XCircle className="h-3 w-3" /> আপনার উত্তর (ভুল)
+                                <XCircle className="h-3 w-3" /> Your Response (Incorrect)
                               </span>
                             )}
                             {isCorrect && (
                               <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1 shrink-0">
-                                <CheckCircle2 className="h-3 w-3" /> সঠিক উত্তর
+                                <CheckCircle2 className="h-3 w-3" /> Correct Key
                               </span>
                             )}
                           </div>
@@ -377,7 +377,7 @@ export default function HistoryAndWrongQuestions({
                       <div className="rounded-xl border border-[#262626] bg-[#121212] p-3.5 text-xs">
                         <div className="flex items-center gap-1.5 font-bold text-[#FACC15] mb-1">
                           <BookOpen className="h-3.5 w-3.5" />
-                          <span>বিশদ সমাধান ও ব্যাখ্যা:</span>
+                          <span>Official Solution & Detailed Explanation:</span>
                         </div>
                         <div className="text-[#CCCCCC] leading-relaxed">
                           <MathText text={keyObj.explanation} />

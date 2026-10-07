@@ -82,7 +82,7 @@ export default function ExamResultView({
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
-    return `${m} মিনিট ${s} সেকেন্ড`;
+    return `${m}m ${s}s`;
   };
 
   return (
@@ -93,12 +93,12 @@ export default function ExamResultView({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#1C1C1C]">
             <div>
               <div className="flex items-center gap-2 text-xs text-[#A3A3A3] mb-1">
-                <span className="text-[#FACC15] font-semibold">পরীক্ষার ফলাফল</span>
+                <span className="text-[#FACC15] font-semibold">Examination Result</span>
                 <span>·</span>
                 <span>{attempt.quizTitle}</span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-[#F5F5F5]">
-                পারফরম্যান্স স্কোরকার্ড
+                Performance Score Card
               </h1>
             </div>
 
@@ -108,14 +108,14 @@ export default function ExamResultView({
                 className="min-h-[44px] flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#000000] px-4 py-2 text-xs font-semibold text-[#F5F5F5] hover:border-[#3F3F3F] transition-colors"
               >
                 <RotateCcw className="h-3.5 w-3.5 text-[#FACC15]" />
-                <span>পুনরায় পরীক্ষা</span>
+                <span>Retake Exam</span>
               </button>
               <button
                 onClick={onGoHome}
                 className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-[#FACC15] px-4 py-2 text-xs font-bold text-black hover:bg-[#EAB308] transition-colors"
               >
                 <Home className="h-3.5 w-3.5" />
-                <span>ড্যাশবোর্ড</span>
+                <span>Dashboard</span>
               </button>
             </div>
           </div>
@@ -125,7 +125,7 @@ export default function ExamResultView({
             {/* Total Score */}
             <div className="flex flex-col rounded-xl border border-[#262626] bg-[#000000] p-4">
               <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                <Award className="h-3.5 w-3.5 text-[#FACC15]" /> প্রাপ্ত নম্বর
+                <Award className="h-3.5 w-3.5 text-[#FACC15]" /> Points Scored
               </span>
               <div className="mt-2 flex items-baseline gap-1 font-mono">
                 <span className="text-2xl sm:text-3xl font-extrabold text-[#FACC15]">
@@ -134,14 +134,14 @@ export default function ExamResultView({
                 <span className="text-xs text-[#A3A3A3]">/ {result.totalMarks}</span>
               </div>
               <span className={`mt-1 text-[11px] font-semibold ${isPassed ? 'text-emerald-400' : 'text-red-400'}`}>
-                {isPassed ? 'উত্তীর্ণ (Passed)' : 'পুনরায় চেষ্টা করুন'}
+                {isPassed ? 'Passed' : 'Needs Practice'}
               </span>
             </div>
 
             {/* Accuracy */}
             <div className="flex flex-col rounded-xl border border-[#262626] bg-[#000000] p-4">
               <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                <BarChart3 className="h-3.5 w-3.5 text-sky-400" /> নির্ভুলতা (Accuracy)
+                <BarChart3 className="h-3.5 w-3.5 text-sky-400" /> Accuracy Rate
               </span>
               <div className="mt-2 flex items-baseline gap-1 font-mono">
                 <span className="text-2xl sm:text-3xl font-extrabold text-[#F5F5F5]">
@@ -149,34 +149,34 @@ export default function ExamResultView({
                 </span>
               </div>
               <span className="mt-1 text-[11px] text-[#A3A3A3]">
-                শতকরা হার: {result.percentage}%
+                Percentage: {result.percentage}%
               </span>
             </div>
 
             {/* Questions Breakdown */}
             <div className="flex flex-col rounded-xl border border-[#262626] bg-[#000000] p-4">
               <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> সঠিক / ভুল
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Correct / Wrong
               </span>
               <div className="mt-2 flex items-baseline gap-2 font-mono text-base sm:text-lg">
                 <span className="text-emerald-400 font-bold">✓ {result.correct}</span>
                 <span className="text-red-400 font-bold">✗ {result.wrong}</span>
               </div>
               <span className="mt-1 text-[11px] text-[#A3A3A3]">
-                উত্তরহীন: {result.unattempted} টি
+                Unattempted: {result.unattempted}
               </span>
             </div>
 
             {/* Time Taken */}
             <div className="flex flex-col rounded-xl border border-[#262626] bg-[#000000] p-4">
               <span className="text-xs text-[#A3A3A3] flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-purple-400" /> ব্যয়িত সময়
+                <Clock className="h-3.5 w-3.5 text-purple-400" /> Time Elapsed
               </span>
               <div className="mt-2 font-mono text-base sm:text-lg font-bold text-[#F5F5F5]">
                 {formatTime(result.timeTakenSec)}
               </div>
               <span className="mt-1 text-[11px] text-[#A3A3A3]">
-                বরাদ্দ: {attempt.durationMinutes} মিনিট
+                Allocated: {attempt.durationMinutes} mins
               </span>
             </div>
           </div>
@@ -185,7 +185,7 @@ export default function ExamResultView({
           {Object.keys(result.topicBreakdown).length > 0 && (
             <div className="mt-6 pt-6 border-t border-[#1C1C1C]">
               <h4 className="text-xs font-semibold text-[#A3A3A3] mb-3">
-                বিষয়ভিত্তিক পারফরম্যান্স বিশ্লেষণ:
+                Topic Performance Breakdown:
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Object.entries(result.topicBreakdown).map(([topic, data]) => {
@@ -220,7 +220,7 @@ export default function ExamResultView({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-lg font-bold text-[#F5F5F5] flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-[#FACC15]" />
-              <span>প্রতিটি প্রশ্নের বিস্তারিত সমাধান ও ব্যাখ্যা</span>
+              <span>Question Solutions & Explanations</span>
             </h2>
 
             {/* Filter buttons */}
@@ -231,7 +231,7 @@ export default function ExamResultView({
                   filter === 'all' ? 'bg-[#262626] text-white' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
-                সব প্রশ্ন ({attempt.totalQuestions})
+                All ({attempt.totalQuestions})
               </button>
               <button
                 onClick={() => setFilter('wrong')}
@@ -239,7 +239,7 @@ export default function ExamResultView({
                   filter === 'wrong' ? 'bg-[#262626] text-red-400' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
-                ভুল ({result.wrong})
+                Wrong ({result.wrong})
               </button>
               <button
                 onClick={() => setFilter('correct')}
@@ -247,7 +247,7 @@ export default function ExamResultView({
                   filter === 'correct' ? 'bg-[#262626] text-emerald-400' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
-                সঠিক ({result.correct})
+                Correct ({result.correct})
               </button>
               <button
                 onClick={() => setFilter('unattempted')}
@@ -255,7 +255,7 @@ export default function ExamResultView({
                   filter === 'unattempted' ? 'bg-[#262626] text-purple-400' : 'text-[#A3A3A3] hover:text-white'
                 }`}
               >
-                অনুত্তরিত ({result.unattempted})
+                Unattempted ({result.unattempted})
               </button>
             </div>
           </div>
@@ -284,7 +284,7 @@ export default function ExamResultView({
                   {/* Top status bar */}
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#222]">
                     <div className="flex items-center gap-2 text-xs text-[#A3A3A3]">
-                      <span className="font-bold text-[#F5F5F5]">প্রশ্ন #{item.index}</span>
+                      <span className="font-bold text-[#F5F5F5]">Question #{item.index}</span>
                       <span>·</span>
                       <span>{q.subject}</span>
                       <span>·</span>
@@ -294,15 +294,15 @@ export default function ExamResultView({
                     <div className="flex items-center gap-1.5 text-xs font-semibold">
                       {isCorrect ? (
                         <span className="text-emerald-400 flex items-center gap-1">
-                          <Check className="h-4 w-4" /> সঠিক (+{evalInfo.marksAwarded})
+                          <Check className="h-4 w-4" /> Correct (+{evalInfo.marksAwarded})
                         </span>
                       ) : isUnattempted ? (
                         <span className="text-[#A3A3A3] flex items-center gap-1">
-                          <Minus className="h-4 w-4" /> উত্তর দেওয়া হয়নি (০)
+                          <Minus className="h-4 w-4" /> Unattempted (0)
                         </span>
                       ) : (
                         <span className="text-red-400 flex items-center gap-1">
-                          <X className="h-4 w-4" /> ভুল ({evalInfo.marksAwarded})
+                          <X className="h-4 w-4" /> Wrong ({evalInfo.marksAwarded})
                         </span>
                       )}
                     </div>
@@ -332,19 +332,19 @@ export default function ExamResultView({
                           className={`flex items-start gap-3 p-3 rounded-lg border text-xs sm:text-sm ${optClasses}`}
                         >
                           <span className="font-mono font-bold text-xs">
-                            {['ক', 'খ', 'গ', 'ঘ', 'ঙ'][optIdx] || optIdx + 1}.
+                            {['A', 'B', 'C', 'D', 'E'][optIdx] || optIdx + 1}.
                           </span>
                           <div className="flex-1">
                             <MathText content={opt.text} />
                           </div>
                           {isCorrectOption && (
                             <span className="text-[11px] font-bold text-emerald-400 shrink-0">
-                              (সঠিক উত্তর)
+                              (Correct Key)
                             </span>
                           )}
                           {isUserSelected && !isCorrectOption && (
                             <span className="text-[11px] font-bold text-red-400 shrink-0">
-                              (আপনার উত্তর)
+                              (Your Selection)
                             </span>
                           )}
                         </div>
@@ -355,7 +355,7 @@ export default function ExamResultView({
                   {/* Explanation Block */}
                   {evalInfo.explanation && (
                     <div className="p-3.5 rounded-lg border border-[#262626] bg-[#000000] text-xs leading-relaxed text-[#D4D4D4]">
-                      <strong className="text-[#FACC15] block mb-1">সমাধান ও ব্যাখ্যা:</strong>
+                      <strong className="text-[#FACC15] block mb-1">Solution & Explanation:</strong>
                       <MathText content={evalInfo.explanation} />
                     </div>
                   )}

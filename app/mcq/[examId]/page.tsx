@@ -1,4 +1,4 @@
-import AppMasterShell from '../../../components/AppMasterShell';
+import { redirect } from 'next/navigation';
 
 interface MCQExamDetailPageProps {
   params: Promise<{ examId: string }>;
@@ -6,5 +6,6 @@ interface MCQExamDetailPageProps {
 
 export default async function MCQExamDetailPage({ params }: MCQExamDetailPageProps) {
   const resolvedParams = await params;
-  return <AppMasterShell initialTab="mcq" initialExamId={resolvedParams.examId} />;
+  redirect(`/exam/${resolvedParams.examId}/instructions`);
 }
+

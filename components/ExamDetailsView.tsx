@@ -95,30 +95,30 @@ export default function ExamDetailsView({
         {/* 4-Column Exam Key Parameters Matrix */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl border border-[#262626] bg-[#000000] text-xs">
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">মোট প্রশ্ন (Questions)</span>
+            <span className="text-[11px] text-[#A3A3A3]">Total Questions</span>
             <span className="text-base font-bold text-[#F5F5F5] font-mono mt-0.5">
-              {quiz.totalQuestions || quiz.questionIds.length} টি
+              {quiz.totalQuestions || quiz.questionIds.length} Items
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">সময়সীমা (Duration)</span>
+            <span className="text-[11px] text-[#A3A3A3]">Duration</span>
             <span className="text-base font-bold text-[#F5F5F5] font-mono mt-0.5">
-              {quiz.settings.durationMinutes} মিনিট
+              {quiz.settings.durationMinutes} Minutes
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">পূর্ণমান (Total Marks)</span>
+            <span className="text-[11px] text-[#A3A3A3]">Total Marks</span>
             <span className="text-base font-bold text-[#F5F5F5] font-mono mt-0.5">
               {quiz.settings.totalMarks}
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">নেগেটিভ মার্কিং (Negative)</span>
+            <span className="text-[11px] text-[#A3A3A3]">Negative Marking</span>
             <span className="text-base font-bold text-[#EF4444] font-mono mt-0.5">
-              {quiz.settings.negativeRatio > 0 ? `-${quiz.settings.negativeRatio}` : 'নেই'}
+              {(quiz.settings.negativeRatio ?? 0) > 0 ? `-${quiz.settings.negativeRatio}` : 'None'}
             </span>
           </div>
         </div>
@@ -127,19 +127,19 @@ export default function ExamDetailsView({
         <div className="space-y-3 pt-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[#A3A3A3] flex items-center gap-1.5">
             <FileText className="h-4 w-4 text-[#FACC15]" />
-            <span>পরীক্ষার গুরুত্বপূর্ণ নিয়মাবলী</span>
+            <span>Pre-flight Examination Rules</span>
           </h3>
 
           <ul className="space-y-2 text-xs text-[#A3A3A3] leading-relaxed list-disc list-inside">
-            <li>পরীক্ষা শুরু করার পর স্বয়ংক্রিয় কাউন্টডাউন টাইমার চালু হবে।</li>
-            <li>প্রতিটি অপশন নির্বাচনে আপনার উত্তর তাৎক্ষণিকভাবে ক্লাউডে অটো-সেভ হবে।</li>
-            <li>সময় শেষ হলে পরীক্ষা স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</li>
-            {quiz.settings.negativeRatio > 0 && (
+            <li>Countdown timer runs continuously upon launching the examination stage.</li>
+            <li>Selected options are continuously auto-saved in local draft memory.</li>
+            <li>The exam automatically finalizes when the timer reaches 00:00.</li>
+            {(quiz.settings.negativeRatio ?? 0) > 0 && (
               <li className="text-[#EF4444]">
-                সতর্কতা: প্রতিটি ভুল উত্তরের জন্য {quiz.settings.negativeRatio} নম্বর কাটা যাবে।
+                Penalty warning: -{quiz.settings.negativeRatio} points deducted for each incorrect answer.
               </li>
             )}
-            <li>জমা দেওয়ার পর তাৎক্ষণিক সমাধান, স্কোরকার্ড ও ব্যাখ্যা দেখতে পারবেন।</li>
+            <li>Instant score card, accuracy metrics, and solutions will be provided upon submission.</li>
           </ul>
         </div>
 
@@ -149,7 +149,7 @@ export default function ExamDetailsView({
             onClick={onBack}
             className="h-11 px-5 rounded-xl border border-[#262626] bg-[#0A0A0A] hover:bg-[#141414] text-xs font-semibold text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors text-center"
           >
-            ফিরে যান
+            Back
           </button>
 
           {isInProgress && userAttempt ? (
@@ -158,7 +158,7 @@ export default function ExamDetailsView({
               className="h-11 px-6 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98]"
             >
               <Play className="h-4 w-4 fill-black" />
-              <span>পরীক্ষা চালিয়ে যান (Continue Exam)</span>
+              <span>Resume Active Exam</span>
             </button>
           ) : (
             <button
@@ -166,7 +166,7 @@ export default function ExamDetailsView({
               className="h-11 px-6 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98]"
             >
               <Play className="h-4 w-4 fill-black" />
-              <span>{isCompleted ? 'পুনরায় পরীক্ষা শুরু করুন' : 'Start MCQ Exam'}</span>
+              <span>{isCompleted ? 'Retake Examination' : 'Start MCQ Exam'}</span>
             </button>
           )}
         </div>

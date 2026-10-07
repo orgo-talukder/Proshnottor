@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import AdminAppShell from '../../../components/shells/AdminAppShell';
 import { collection, getDocs, doc, deleteDoc, setDoc } from 'firebase/firestore';
@@ -27,7 +27,6 @@ export default function AdminQuestionsPage() {
   const [saving, setSaving] = useState(false);
 
   const fetchQuestionsAndKeys = async () => {
-    setLoading(true);
     try {
       const qSnap = await getDocs(collection(db, 'questions'));
       const qList: Question[] = [];
@@ -47,7 +46,25 @@ export default function AdminQuestionsPage() {
   };
 
   useEffect(() => {
-    fetchQuestionsAndKeys();
+    async function loadData() {
+      try {
+        const qSnap = await getDocs(collection(db, 'questions'));
+        const qList: Question[] = [];
+        qSnap.forEach((d) => qList.push({ ...(d.data() as Question), id: d.id }));
+
+        const kSnap = await getDocs(collection(db, 'questionKeys'));
+        const kMap: Record<string, QuestionKey> = {};
+        kSnap.forEach((d) => (kMap[d.id] = d.data() as QuestionKey));
+
+        setQuestions(qList);
+        setKeysMap(kMap);
+      } catch (err) {
+        console.error('Failed to load admin questions:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, []);
 
   const handleCreateQuestion = async (e: React.FormEvent) => {

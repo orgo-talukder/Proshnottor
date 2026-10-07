@@ -103,7 +103,7 @@ export default function ExamRunnerPage() {
       alert('An error occurred during submission.');
       setSubmitting(false);
     }
-  }, [submitting, attemptId, examId, user?.uid, userAnswers, startTime, questions, router]);
+  }, [submitting, attemptId, examId, user, userAnswers, startTime, questions, router]);
 
   // Countdown Timer Hook
   useEffect(() => {

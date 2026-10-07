@@ -551,7 +551,7 @@ export function evaluateAttempt(attemptId: string, reason: 'manual' | 'timeout' 
   const attempt = { ...attempts[idx] };
   const quizzes = getStoredQuizzes();
   const quiz = quizzes.find((q) => q.id === attempt.quizId);
-  const negativeRatio = quiz ? quiz.settings.negativeRatio : 0.25;
+  const negativeRatio = quiz ? (quiz.settings.negativeRatio ?? 0.25) : 0.25;
   const questions = getStoredQuestions();
   const keys = getStoredQuestionKeys();
 

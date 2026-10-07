@@ -31,7 +31,7 @@ interface StudentAppShellProps {
 
 export default function StudentAppShell({ children, pageTitle }: StudentAppShellProps) {
   const pathname = usePathname();
-  const router = Router();
+  const router = useRouter();
   const { user, profile, isAdmin, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 

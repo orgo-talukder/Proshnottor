@@ -135,7 +135,7 @@ export default function AdminPortal({
       (item) =>
         item.stem.toLowerCase().includes(q) ||
         item.subject.toLowerCase().includes(q) ||
-        item.topic.toLowerCase().includes(q)
+        (item.topic || '').toLowerCase().includes(q)
     );
   }, [questions, questionSearch]);
 
@@ -400,9 +400,9 @@ export default function AdminPortal({
             <div className="inline-flex h-12 w-12 rounded-2xl bg-purple-950/60 border border-purple-800 text-purple-400 items-center justify-center mb-2">
               <KeyRound className="h-6 w-6" />
             </div>
-            <h2 className="text-xl font-bold text-[#F5F5F5]">অ্যাডমিন পাসওয়ার্ড নিশ্চিতকরণ</h2>
+            <h2 className="text-xl font-bold text-[#F5F5F5]">Administrator Security Verification</h2>
             <p className="text-xs text-[#A3A3A3]">
-              নিরাপত্তার স্বার্থে <span className="text-[#FACC15] font-mono">{ADMIN_ALLOWLIST_EMAIL}</span> অ্যাকাউন্টের অ্যাক্সেস নিশ্চিত করুন।
+              Confirm administrative session credentials for <span className="text-[#FACC15] font-mono">{ADMIN_ALLOWLIST_EMAIL}</span>.
             </p>
           </div>
 

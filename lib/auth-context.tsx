@@ -16,7 +16,17 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile } from './types';
 
-export const ADMIN_ALLOWLIST_EMAIL = 'argotalukder70@gmail.com';
+export const ADMIN_ALLOWLIST_EMAILS = [
+  'baptutalukder503@gmail.com',
+  'argotalukder70@gmail.com',
+];
+
+export const ADMIN_ALLOWLIST_EMAIL = 'baptutalukder503@gmail.com';
+
+export function isAllowedAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return ADMIN_ALLOWLIST_EMAILS.includes(email.toLowerCase().trim());
+}
 
 interface AuthContextType {
   user: User | null;
@@ -40,8 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [adminVerified, setAdminVerified] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Is user the explicitly authorized admin?
-  const isAdmin = Boolean(user && user.email && user.email.toLowerCase() === ADMIN_ALLOWLIST_EMAIL.toLowerCase());
+  // Is user an explicitly authorized admin?
+  const isAdmin = Boolean(user && user.email && isAllowedAdminEmail(user.email));
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -56,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(data);
           } else {
             // Initialize new profile
-            const isUserAdmin = currentUser.email?.toLowerCase() === ADMIN_ALLOWLIST_EMAIL.toLowerCase();
+            const isUserAdmin = isAllowedAdminEmail(currentUser.email);
             const newProfile: UserProfile = {
               id: currentUser.uid,
               email: currentUser.email || '',
@@ -78,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: currentUser.uid,
             email: currentUser.email || '',
             displayName: currentUser.displayName || 'শিক্ষার্থী',
-            role: currentUser.email?.toLowerCase() === ADMIN_ALLOWLIST_EMAIL.toLowerCase() ? 'admin' : 'student',
+            role: isAllowedAdminEmail(currentUser.email) ? 'admin' : 'student',
             streak: 1,
             createdAt: new Date().toISOString(),
           });
@@ -106,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUpWithEmail = async (email: string, pass: string, displayName: string) => {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
     if (cred.user) {
-      const isUserAdmin = email.trim().toLowerCase() === ADMIN_ALLOWLIST_EMAIL.toLowerCase();
+      const isUserAdmin = isAllowedAdminEmail(email.trim());
       const newProfile: UserProfile = {
         id: cred.user.uid,
         email: cred.user.email || email.trim(),
@@ -122,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const reauthenticateAdmin = async (password: string): Promise<boolean> => {
     if (!user || !user.email) return false;
-    if (user.email.toLowerCase() !== ADMIN_ALLOWLIST_EMAIL.toLowerCase()) return false;
+    if (!isAllowedAdminEmail(user.email)) return false;
 
     try {
       const credential = EmailAuthProvider.credential(user.email, password);
@@ -132,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.warn('Admin password re-auth failed with password, attempting credential verification...', e);
       // If user logged in with Google provider or initial password attempt, verify email match directly
-      if (user.email.toLowerCase() === ADMIN_ALLOWLIST_EMAIL.toLowerCase()) {
+      if (isAllowedAdminEmail(user.email)) {
         setAdminVerified(true);
         return true;
       }

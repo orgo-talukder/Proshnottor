@@ -62,7 +62,7 @@ export default function BookmarksView({
             Saved Bookmarks
           </h1>
           <p className="text-xs sm:text-sm text-[#A3A3A3] mt-1">
-            গুরুত্বপূর্ণ ও পুনর্বিবেচনার জন্য সংরক্ষিত প্রশ্নাবলী ({bookmarks.length} টি সংরক্ষিত)।
+            Items saved for revision and deliberate practice ({bookmarks.length} saved).
           </p>
         </div>
 
@@ -72,7 +72,7 @@ export default function BookmarksView({
             onChange={(e) => setSubjectFilter(e.target.value)}
             className="h-9 px-3 rounded-xl border border-[#262626] bg-[#0A0A0A] text-xs text-[#F5F5F5] outline-none focus:border-[#FACC15]"
           >
-            <option value="all">সকল বিষয় (All Subjects)</option>
+            <option value="all">All Subjects</option>
             {availableSubjects.map((sub) => (
               <option key={sub} value={sub}>
                 {sub}
@@ -85,15 +85,15 @@ export default function BookmarksView({
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-[#262626] bg-[#0A0A0A] p-12 text-center max-w-md mx-auto">
           <Bookmark className="h-10 w-10 text-[#6B6B6B] mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-[#F5F5F5]">কোনো বুকমার্ক সংরক্ষিত নেই</h3>
+          <h3 className="text-sm font-bold text-[#F5F5F5]">No Saved Bookmarks Yet</h3>
           <p className="text-xs text-[#A3A3A3] mt-1">
-            পরীক্ষা দেওয়ার সময় বা ফলাফল পর্যালোচনার সময় প্রশ্নের পাশে বুকমার্ক আইকনে ক্লিক করে সংরক্ষণ করতে পারবেন।
+            Flag questions during exams or solution reviews to save them here for quick revision.
           </p>
           <button
             onClick={onNavigateToExams}
             className="mt-4 h-9 px-4 rounded-xl bg-[#262626] text-xs font-semibold text-white hover:bg-[#333] transition-colors"
           >
-            MCQ পরীক্ষা দেখুন
+            Explore MCQ Catalog
           </button>
         </div>
       ) : (
@@ -121,7 +121,7 @@ export default function BookmarksView({
                     title="Remove Bookmark"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    <span>মুছে ফেলুন</span>
+                    <span>Remove</span>
                   </button>
                 </div>
 
@@ -150,7 +150,7 @@ export default function BookmarksView({
                         </div>
                         {isCorrect && (
                           <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1 shrink-0">
-                            <CheckCircle2 className="h-3 w-3" /> সঠিক
+                            <CheckCircle2 className="h-3 w-3" /> Correct Key
                           </span>
                         )}
                       </div>
@@ -163,7 +163,7 @@ export default function BookmarksView({
                   <div className="rounded-xl border border-[#262626] bg-[#121212] p-3.5 text-xs">
                     <div className="flex items-center gap-1.5 font-bold text-[#FACC15] mb-1">
                       <BookOpen className="h-3.5 w-3.5" />
-                      <span>বিশদ ব্যাখ্যা:</span>
+                      <span>Detailed Explanation:</span>
                     </div>
                     <div className="text-[#CCCCCC] leading-relaxed">
                       <MathText text={key.explanation} />

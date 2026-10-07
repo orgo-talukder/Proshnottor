@@ -46,21 +46,21 @@ export default function ExamInstructionsModal({
         {/* Key Parameters Matrix */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 p-4 rounded-xl border border-[#262626] bg-[#000000]">
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">মোট প্রশ্ন</span>
-            <span className="text-base font-bold text-[#F5F5F5]">{quiz.totalQuestions} টি</span>
+            <span className="text-[11px] text-[#A3A3A3]">Total Questions</span>
+            <span className="text-base font-bold text-[#F5F5F5]">{quiz.totalQuestions} Items</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">সময়সীমা</span>
-            <span className="text-base font-bold text-[#F5F5F5]">{quiz.settings.durationMinutes} মিনিট</span>
+            <span className="text-[11px] text-[#A3A3A3]">Duration</span>
+            <span className="text-base font-bold text-[#F5F5F5]">{quiz.settings.durationMinutes} Minutes</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">মোট নম্বর</span>
+            <span className="text-[11px] text-[#A3A3A3]">Total Marks</span>
             <span className="text-base font-bold text-[#F5F5F5]">{quiz.settings.totalMarks}</span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#A3A3A3]">নেগেটিভ মার্ক</span>
+            <span className="text-[11px] text-[#A3A3A3]">Negative Ratio</span>
             <span className="text-base font-bold text-red-400">
-              {quiz.settings.negativeRatio > 0 ? `-${quiz.settings.negativeRatio}` : 'নেই'}
+              {(quiz.settings.negativeRatio ?? 0) > 0 ? `-${quiz.settings.negativeRatio}` : 'None'}
             </span>
           </div>
         </div>
@@ -69,32 +69,32 @@ export default function ExamInstructionsModal({
         <div className="mb-6">
           <h4 className="text-xs font-semibold text-[#A3A3A3] mb-3 flex items-center gap-1.5">
             <ShieldAlert className="h-4 w-4 text-[#FACC15]" />
-            প্রশ্ন প্যালেট স্ট্যাটাস চিহ্নের অর্থ:
+            Question Matrix Palette Status Legend:
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-[#A3A3A3]">
             <div className="flex items-center gap-2 p-2 rounded-lg bg-[#000000] border border-[#262626]">
               <span className="h-6 w-6 rounded flex items-center justify-center font-bold text-xs border border-[#3F3F3F] text-[#A3A3A3]">
-                ১
+                1
               </span>
-              <span><strong>দেখা হয়নি:</strong> প্রশ্নটি এখনো ওপেন করেননি।</span>
+              <span><strong>Unvisited:</strong> Question has not been viewed yet.</span>
             </div>
             <div className="flex items-center gap-2 p-2 rounded-lg bg-[#000000] border border-[#262626]">
               <span className="h-6 w-6 rounded flex items-center justify-center font-bold text-xs border border-[#EF4444] text-[#EF4444]">
-                ২
+                2
               </span>
-              <span><strong>অনুত্তরিত:</strong> প্রশ্ন দেখা হয়েছে কিন্তু উত্তর সিলেক্ট করা হয়নি।</span>
+              <span><strong>Unanswered:</strong> Question visited but no option selected.</span>
             </div>
             <div className="flex items-center gap-2 p-2 rounded-lg bg-[#000000] border border-[#262626]">
               <span className="h-6 w-6 rounded flex items-center justify-center font-bold text-xs bg-[#22C55E] text-black">
-                ৩
+                3
               </span>
-              <span><strong>উত্তর সম্পন্ন:</strong> উত্তর সেভ করা হয়েছে।</span>
+              <span><strong>Answered:</strong> Option selected and saved.</span>
             </div>
             <div className="flex items-center gap-2 p-2 rounded-lg bg-[#000000] border border-[#262626]">
               <span className="h-6 w-6 rounded flex items-center justify-center font-bold text-xs bg-[#A855F7] text-white">
-                ৪
+                4
               </span>
-              <span><strong>রিভিউ চিহ্নিত:</strong> পুনরায় পর্যবেক্ষণের জন্য ফ্ল্যাগ করা।</span>
+              <span><strong>Flagged for Review:</strong> Marked for re-verification.</span>
             </div>
           </div>
         </div>
@@ -103,14 +103,14 @@ export default function ExamInstructionsModal({
         <div className="mb-6 p-3 rounded-xl border border-[#262626] bg-[#000000] text-xs text-[#A3A3A3]">
           <div className="flex items-center gap-1.5 font-semibold text-[#F5F5F5] mb-2">
             <Keyboard className="h-4 w-4 text-[#FACC15]" />
-            ডেস্কটপ দ্রুত কীবোর্ড শর্টকাট:
+            Desktop Keyboard Navigation Shortcuts:
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 font-mono text-[11px]">
-            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">1 - 4</kbd> অপশন নির্বাচন</span>
-            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">N / →</kbd> পরবর্তী প্রশ্ন</span>
-            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">P / ←</kbd> পূর্ববর্তী প্রশ্ন</span>
-            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">M</kbd> রিভিউ মার্ক</span>
-            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">C</kbd> ক্লিয়ার উত্তর</span>
+            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">1 - 4</kbd> Select Option</span>
+            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">N / →</kbd> Next Question</span>
+            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">P / ←</kbd> Previous Question</span>
+            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">M</kbd> Toggle Review</span>
+            <span><kbd className="px-1.5 py-0.5 bg-[#1C1C1C] border border-[#333] rounded text-white">C</kbd> Clear Selection</span>
           </div>
         </div>
 
@@ -124,7 +124,7 @@ export default function ExamInstructionsModal({
             className="mt-0.5 h-4 w-4 rounded border-[#3F3F3F] bg-black text-[#FACC15] focus:ring-[#FACC15] cursor-pointer"
           />
           <label htmlFor="agree-rules" className="text-xs text-[#F5F5F5] select-none cursor-pointer leading-relaxed">
-            আমি পরীক্ষার সমস্ত নিয়মাবলি ও নেগেটিভ মার্কিংয়ের শর্তাবলী পড়েছি এবং একমত হয়ে পরীক্ষা আরম্ভ করতে প্রস্তুত।
+            I have read and acknowledged all examination rules and negative marking terms.
           </label>
         </div>
 
@@ -134,7 +134,7 @@ export default function ExamInstructionsModal({
             onClick={onClose}
             className="rounded-lg border border-[#262626] bg-[#0A0A0A] px-4 py-2 text-xs font-medium text-[#A3A3A3] hover:bg-[#141414] hover:text-[#F5F5F5] transition-colors"
           >
-            বাতিল
+            Cancel
           </button>
           <button
             disabled={!agreed}
@@ -145,7 +145,7 @@ export default function ExamInstructionsModal({
                 : 'bg-[#262626] text-[#6B6B6B] cursor-not-allowed'
             }`}
           >
-            পরীক্ষা শুরু করুন
+            Launch Examination
           </button>
         </div>
       </div>

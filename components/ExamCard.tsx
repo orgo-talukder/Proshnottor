@@ -66,23 +66,23 @@ export default function ExamCard({ quiz, onStartExam, onViewInstructions }: Exam
         <div className="mt-5 grid grid-cols-3 gap-2 py-3 border-y border-[#1C1C1C] text-xs">
           <div className="flex flex-col">
             <span className="text-[11px] text-[#A3A3A3] flex items-center gap-1">
-              <HelpCircle className="h-3 w-3" /> প্রশ্ন
+              <HelpCircle className="h-3 w-3" /> Questions
             </span>
             <span className="font-bold text-[#F5F5F5] font-mono mt-0.5">
-              {quiz.totalQuestions} টি
+              {quiz.totalQuestions} Items
             </span>
           </div>
           <div className="flex flex-col">
             <span className="text-[11px] text-[#A3A3A3] flex items-center gap-1">
-              <Clock className="h-3 w-3" /> সময়
+              <Clock className="h-3 w-3" /> Duration
             </span>
             <span className="font-bold text-[#F5F5F5] font-mono mt-0.5">
-              {quiz.settings.durationMinutes} মিনিট
+              {quiz.settings.durationMinutes} Mins
             </span>
           </div>
           <div className="flex flex-col">
             <span className="text-[11px] text-[#A3A3A3] flex items-center gap-1">
-              <Award className="h-3 w-3" /> পূর্ণমান
+              <Award className="h-3 w-3" /> Total Marks
             </span>
             <span className="font-bold text-[#FACC15] font-mono mt-0.5">
               {quiz.settings.totalMarks}
@@ -93,17 +93,17 @@ export default function ExamCard({ quiz, onStartExam, onViewInstructions }: Exam
         {/* Negative marking indicator if applicable */}
         <div className="mt-3 flex items-center justify-between text-[11px] text-[#A3A3A3]">
           <span>
-            কঠিনতা:{' '}
+            Difficulty:{' '}
             <strong className="text-[#D4D4D4] font-semibold">
-              {quiz.difficulty === 'easy' ? 'সহজ' : quiz.difficulty === 'medium' ? 'মাঝারি' : 'কঠিন'}
+              {quiz.difficulty === 'easy' ? 'Easy' : quiz.difficulty === 'medium' ? 'Medium' : 'Hard'}
             </strong>
           </span>
-          {quiz.settings.negativeRatio > 0 ? (
+          {(quiz.settings.negativeRatio ?? 0) > 0 ? (
             <span className="text-red-400/90 font-medium">
-              নেগেটিভ মার্কিং: -{quiz.settings.negativeRatio}
+              Penalty: -{quiz.settings.negativeRatio ?? 0}
             </span>
           ) : (
-            <span className="text-emerald-400/80">নেগেটিভ নেই</span>
+            <span className="text-emerald-400/80">No Penalty</span>
           )}
         </div>
       </div>
@@ -114,14 +114,14 @@ export default function ExamCard({ quiz, onStartExam, onViewInstructions }: Exam
           onClick={() => onViewInstructions(quiz)}
           className="min-h-[44px] px-2 text-xs text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FACC15] rounded flex items-center"
         >
-          নিয়মাবলি
+          Instructions
         </button>
 
         <button
           onClick={() => onStartExam(quiz)}
           className="min-h-[44px] flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#FACC15] px-4 py-2.5 text-xs sm:text-sm font-bold text-black transition-all hover:bg-[#EAB308] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FACC15]"
         >
-          <span>{isMock ? 'মক টেস্ট দিন' : 'অনুশীলন শুরু করুন'}</span>
+          <span>{isMock ? 'Launch Mock Test' : 'Start Practice'}</span>
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>

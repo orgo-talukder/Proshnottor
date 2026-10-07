@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import AdminAppShell from '../../../components/shells/AdminAppShell';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
@@ -23,7 +23,6 @@ export default function AdminQuizzesPage() {
   const [saving, setSaving] = useState(false);
 
   const fetchData = async () => {
-    setLoading(true);
     try {
       const zSnap = await getDocs(collection(db, 'quizzes'));
       const zList: Quiz[] = [];
@@ -43,7 +42,25 @@ export default function AdminQuizzesPage() {
   };
 
   useEffect(() => {
-    fetchData();
+    async function loadData() {
+      try {
+        const zSnap = await getDocs(collection(db, 'quizzes'));
+        const zList: Quiz[] = [];
+        zSnap.forEach((d) => zList.push({ ...(d.data() as Quiz), id: d.id }));
+
+        const qSnap = await getDocs(collection(db, 'questions'));
+        const qList: Question[] = [];
+        qSnap.forEach((d) => qList.push({ ...(d.data() as Question), id: d.id }));
+
+        setQuizzes(zList);
+        setQuestions(qList);
+      } catch (err) {
+        console.error('Failed to load admin quizzes:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, []);
 
   const handleCreateQuiz = async (e: React.FormEvent) => {

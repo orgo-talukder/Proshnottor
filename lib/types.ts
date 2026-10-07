@@ -55,52 +55,59 @@ export interface Question {
   id: string;
   stem: string; // Markdown + LaTeX with $...$ or $$...$$
   options: QuestionOption[];
-  type: QuestionType;
+  type?: QuestionType;
   subject: string;
-  topic: string;
-  difficulty: Difficulty;
+  topic?: string;
+  difficulty?: Difficulty;
   defaultMarks: number;
-  language: 'bn' | 'en';
+  language?: 'bn' | 'en';
 }
 
 export interface QuestionKey {
-  questionId: string;
+  id?: string;
+  questionId?: string;
+  correctIndex?: number;
   correctOptionIds: string[];
   explanation: string; // Explanations with math equations
 }
 
 export interface QuizSettings {
   durationMinutes: number;
-  totalMarks: number;
-  negativeRatio: number; // e.g. 0.25
-  shuffleQuestions: boolean;
-  shuffleOptions: boolean;
-  resultMode: ResultMode;
-  passPercentage: number;
-  maxAttempts: number | null;
+  totalMarks?: number;
+  negativeRatio?: number; // e.g. 0.25
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  showInstantExplanation?: boolean;
+  resultMode?: ResultMode;
+  passPercentage?: number;
+  maxAttempts?: number | null;
 }
 
 export interface Quiz {
   id: string;
-  slug: string;
+  slug?: string;
   title: string;
   description: string;
   type: ExamType;
-  subject: string;
-  difficulty: Difficulty;
+  subject?: string;
+  difficulty?: Difficulty;
   settings: QuizSettings;
   questionIds: string[];
-  totalQuestions: number;
+  totalQuestions?: number;
   status: 'published' | 'draft' | 'archived';
   createdAt: string;
 }
 
 export interface ExamAnswerState {
   selected: string[];
-  visited: boolean;
-  markedForReview: boolean;
-  timeSpentMs: number;
+  visited?: boolean;
+  markedForReview?: boolean;
+  timeSpentMs?: number;
   answeredAt?: number;
+  isCorrect?: boolean;
+  correctOptionIds?: string[];
+  explanation?: string;
+  marksAwarded?: number;
 }
 
 export interface ExamEvaluationResult {
@@ -130,7 +137,7 @@ export interface ExamAttempt {
   id: string;
   token: string;
   userId: string;
-  userName: string;
+  userName?: string;
   quizId: string;
   quizTitle: string;
   quizType: ExamType;
@@ -140,8 +147,13 @@ export interface ExamAttempt {
   startedAt: number;
   expiresAt: number;
   submittedAt?: number;
-  status: 'in_progress' | 'submitted' | 'auto_submitted' | 'evaluated';
+  status: 'in_progress' | 'submitted' | 'auto_submitted' | 'evaluated' | 'completed';
   submitReason?: 'manual' | 'timeout';
+  score?: number;
+  correctCount?: number;
+  wrongCount?: number;
+  unattemptedCount?: number;
+  accuracy?: number;
   questionOrder: string[];
   answers: Record<string, ExamAnswerState>;
   result?: ExamEvaluationResult;
