@@ -1,5 +1,13 @@
-import AppMasterShell from '../../components/AppMasterShell';
+'use client';
+
+import React from 'react';
+import StudentAppShell from '../../components/shells/StudentAppShell';
+import DashboardView from '../../components/views/DashboardView';
 
 export default function DashboardPage() {
-  return <AppMasterShell initialTab="dashboard" />;
+  return (
+    <StudentAppShell pageTitle="Examinee Dashboard">
+      <DashboardView />
+    </StudentAppShell>
+  );
 }

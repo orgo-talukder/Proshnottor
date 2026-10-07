@@ -1,6 +1,6 @@
 {
-  "name": "প্রশ্নোত্তর (Proshnottor) - অনলাইন কুইজ ও মক এক্সাম",
-  "description": "বিসিএস, বিশ্ববিদ্যালয় ভর্তি ও সরকারি চাকরি পরীক্ষার প্রস্তুতির আধুনিক পিওর ব্ল্যাক অনলাইন কুইজ ও মক টেস্ট প্ল্যাটফর্ম।",
+  "name": "Chorcha - Online Exam & Quiz Evaluation Platform",
+  "description": "Pure Black online mock exam and practice platform for competitive examinations.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
